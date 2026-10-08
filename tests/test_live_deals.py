@@ -143,6 +143,8 @@ class LiveDealTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         root = Path(self.folder.name)
+        from miniapp_fixture import published_form
+        published_form(self, root)
         self.path = root/'primary.sqlite3'
         self.store = Store(self.path)
         for tg,b24 in ((100,132),(200,133)):

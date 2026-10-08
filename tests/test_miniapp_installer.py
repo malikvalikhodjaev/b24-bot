@@ -10,13 +10,14 @@ spec.loader.exec_module(installer)
 
 class InstallerTests(unittest.TestCase):
     def test_patch_is_additive_and_idempotent(self):
-        source = (ROOT.parent / 'outputs/fom-pharma-portfolio-work/scripts/dashboard_server.py').read_text(encoding='utf-8')
-        original = source.replace(installer.METHOD, '', 1).replace('\n        if self.serve_bot_form(request_path):\n            return\n', '')
+        original = (ROOT / 'tests/fixtures/dashboard_handler.py').read_text(encoding='utf-8')
         updated = installer.patch_source(original)
-        self.assertEqual(updated, source)
+        self.assertEqual(updated.replace(installer.METHOD, '', 1).replace(
+            '\n        if self.serve_bot_form(request_path):\n            return\n', ''), original)
         self.assertEqual(installer.patch_source(updated), updated)
         self.assertIn('if not self.ensure_authorized():', updated)
         self.assertEqual(original.count('if not self.ensure_authorized():'), updated.count('if not self.ensure_authorized():'))
+        self.assertEqual(updated.count('if self.serve_bot_form(request_path):'), 2)
 
     def test_changed_or_ambiguous_handler_is_rejected(self):
         with self.assertRaises(RuntimeError): installer.patch_source('class Example: pass\n')

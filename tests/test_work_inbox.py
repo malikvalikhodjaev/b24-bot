@@ -24,6 +24,8 @@ from test_live_deals import DealApi
 class WorkInboxTests(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
+        from miniapp_fixture import published_form
+        published_form(self, self.folder.name)
         self.path = Path(self.folder.name)/'primary.sqlite3'
         self.primary = Store(self.path)
         for tg,b24,name in ((100,132,'Малик'),(200,133,'Менеджер ФОМ'),(300,134,'Техник'),(400,135,'Обучающий'),(500,136,'Другой менеджер')):

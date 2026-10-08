@@ -25,7 +25,10 @@ case "$python_path" in /home/malik/.local/share/fom-bot-runtime/python/*/bin/pyt
 "$python_path" -m venv "$bot_root/.venv"
 mkdir -m 700 "$bot_root/data"
 cd "$bot_root"
-PYTHONPATH=src:tests .venv/bin/python -m unittest discover -s tests -q >data/server-tests.log 2>&1
+if ! PYTHONPATH=src:tests .venv/bin/python -m unittest discover -s tests -q >data/server-tests.log 2>&1; then
+  tail -n 80 data/server-tests.log >&2
+  exit 1
+fi
 unit_path=/home/malik/.config/systemd/user/fom-bitrix-bot.service
 if [[ -e "$unit_path" ]]; then
   printf '%s\n' 'Existing service unit preserved.' >&2

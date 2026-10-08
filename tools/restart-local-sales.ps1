@@ -1,6 +1,11 @@
 param([switch]$VerifyLiveDeal, [string]$RepairRequisiteRequest, [switch]$RecoverDiagnostic, [string]$FinishConfirmedRequest, [switch]$ShowReminderPreview, [switch]$HideReminderCode, [switch]$StartIfStopped)
 $ErrorActionPreference = 'Stop'
 $botRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$hostingPath = Join-Path $botRoot 'data/server-hosting.json'
+if (Test-Path -LiteralPath $hostingPath) {
+    $hosting = Get-Content -LiteralPath $hostingPath -Raw | ConvertFrom-Json
+    if ($hosting.active -eq $true) { throw 'Бот работает на VPS. Используйте systemctl --user restart fom-bitrix-bot.service на сервере.' }
+}
 $recordPath = Join-Path $botRoot 'data/registration-process.json'
 $recordText = Get-Content -LiteralPath $recordPath -Raw
 $record = $recordText | ConvertFrom-Json
