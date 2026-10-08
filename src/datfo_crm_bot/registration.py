@@ -236,7 +236,13 @@ class Registration:
             okb += [[INBOX]]
             if self.support_statistics_allowed(telegram_id):
                 okb += [[STATS]]
-        return with_guide(okb + [[PROFILE], [SETTINGS]] if self.user(telegram_id) else [[REGISTER], [PROFILE], [SETTINGS]])
+        rows = []
+        for row in okb:
+            if len(row) == 1 and rows and len(rows[-1]) == 1:
+                rows[-1].extend(row)
+            else:
+                rows.append(list(row))
+        return with_guide(rows + [[PROFILE, SETTINGS]] if self.user(telegram_id) else [[REGISTER], [PROFILE, SETTINGS]])
 
     def handle(self, update: dict, bot=None) -> None:
         message = update.get("message", {})
