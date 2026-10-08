@@ -1,0 +1,13 @@
+{
+  "category_id": 47,
+  "native_queue_routing": true,
+  "stages": {
+    "dispatch": {"id": "C47:NEW", "title": "Распределитель"},
+    "r1": {"id": "C47:UC_V2TW36", "title": "Новые заявки, R1"},
+    "r234": {"id": "C47:PREPARATION", "title": "Новые заявки, R2-R3-R4"},
+    "working": {"id": "C47:PREPAYMENT_INVOIC", "title": "В работе"},
+    "waiting": {"id": "C47:EXECUTING", "title": "В ожидании"},
+    "closed": {"id": "C47:WON", "title": "Заявка завершена"},
+    "failed": {"id": "C47:LOSE", "title": "Заявка провалена"}
+  }
+}

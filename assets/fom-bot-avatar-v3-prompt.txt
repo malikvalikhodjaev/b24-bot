@@ -1,0 +1,10 @@
+Edited with the built-in image_gen tool on 2026-10-07.
+Edit target: assets/fom-bot-avatar-v2.png
+
+Use case: precise-object-edit / logo-brand.
+Edit target: the supplied existing FOM Telegram bot avatar.
+Task: create its next version for SALES MANAGERS, keeping the recognizable monochrome FOM identity.
+Replace the current wrench-and-check pictogram with a bold, minimal icon of a manager communicating with a client: one abstract circular head above broad suit shoulders, a simple tie in negative space, integrated inside a rounded speech-bubble outline. The manager icon must be instantly readable as a business person at 48–64 pixels, not a mechanic, robot, or headset operator. Use only these few simple shapes and generous negative space.
+Keep the exact uppercase Latin wordmark "FOM" (F, O, M), centered below the icon, in the same bold geometric sans-serif spirit, with no other text.
+Keep a solid white background, near-black mark and letters, crisp flat edges, balanced square composition, no color gradients, shadows, textures, borders, mockups or watermarks.
+Keep the complete icon and wordmark comfortably inside a circular Telegram avatar crop, with generous margins. The manager symbol is the focal point. Deliver one polished square raster avatar, not a sheet of options.

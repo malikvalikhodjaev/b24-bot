@@ -1,0 +1,10 @@
+Built-in image_gen edit, 2026-10-07.
+Base: simplified-1-monitor.png. New avatar concept only; no live bot profile/name changed.
+
+Use case: precise-object-edit / logo-brand.
+Edit target: the supplied FOM avatar showing a sales manager presenting a screen with an outstretched hand.
+Create a refined next variant that communicates an IT sales manager, a conversational bot, deal management, and pharmacies. Keep the exact current composition and preserve the presentation gesture, large circular black head, broad black suit, red tie, white background, and three distinct red square FOM tiles with exact white letters F, O, M underneath. Do not restore the large outer speech-bubble frame: the human and the screen must remain large.
+
+Change the monitor itself: make its thick near-black outer outline a simple rounded rectangular CHAT BUBBLE with a short clean tail at the bottom-left, aimed toward the presenting hand. Retain a short broad monitor stand underneath, so it reads as both a computer display and conversation. Inside the white display put a SINGLE LARGE DEAL CARD: one simple thick near-black rounded rectangular card outline and ONE LARGE GREEN CHECK MARK prominently centered inside it. The card and check must be bold enough to read at 48 pixels; no tiny text lines. Place ONE SIMPLE GREEN PHARMACY PLUS in the upper-right corner of the screen, separated from the deal card by a clear white gap and large enough to remain recognizable. Balance the card and pharmacy plus as two clear big marks, not a dense application interface.
+
+Avoid pills, shopping carts, charts, little toolbar dots, small status indicators, miniature icons, extra text, new logos, more people, gradients, texture, shadows and 3D. Use the existing FOM red, near-black, white and green accent. Keep generous clean negative space between the hand, screen, tie and FOM brand strip. Fit the entire main mark safely inside a circular Telegram avatar crop. Deliver one polished square raster avatar.

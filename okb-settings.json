@@ -1,0 +1,29 @@
+{
+  "requisite_preset_id": 4,
+  "default_status_id": "4798",
+  "default_stage_id": "DT1034_17:UC_EF7EB7",
+  "pharmacy": {
+    "entity_type_id": 1034,
+    "category_id": 17,
+    "responsible_id": null,
+    "fields": {
+      "title": "title",
+      "company_id": "companyId",
+      "responsible_id": "assignedById",
+      "request_id": "xmlId",
+      "address": "UF_CRM_8_1719398485569",
+      "phone": "UF_CRM_8_1719398563749",
+      "manager_ids": "UF_CRM_8_1735795380",
+      "business_region": "UF_CRM_8_1770098187583",
+      "city": "UF_CRM_8_1770098795491",
+      "landmark": "UF_CRM_8_1719398499504",
+      "latitude": "UF_CRM_8_1719398528083",
+      "longitude": "UF_CRM_8_1719398518671",
+      "status": "UF_CRM_8_1772692252313",
+      "stage": "stageId",
+      "contact_ids": "contactIds",
+      "current_program": "UF_CRM_8_CURRENT_PROGRAM"
+    },
+    "defaults": {"opened": "N"}
+  }
+}

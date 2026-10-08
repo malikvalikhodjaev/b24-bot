@@ -1,0 +1,15 @@
+Built-in image_gen edit, 2026-10-07. Version 4.
+Edit target: assets/fom-bot-avatar-v3.png.
+Brand reference: user-provided FOM Uzbekistan logo (red tiles with white F, O, M).
+
+Use case: compositing / logo-brand.
+Asset type: square Telegram profile avatar for the FOM sales managers bot.
+
+Input image 1: EDIT TARGET, the existing FOM bot avatar with a single abstract manager in a suit and tie inside a speech bubble, with a black FOM wordmark underneath.
+Input image 2: BRAND REFERENCE, the official FOM Uzbekistan mark: three separate vivid red square tiles containing the white uppercase letters F, O, M.
+
+Edit the first avatar to incorporate the recognizable red branding of image 2. Preserve the existing manager pictogram and the simple speech-bubble geometry: one round head, broad suit shoulders, tie, clean negative space. Keep the head and suit near black; change the speech-bubble outline and the tie to the same saturated FOM red as the reference (approximately #E51A25). Replace the black FOM text underneath with the THREE DISTINCT RED SQUARE TILES from the brand reference, each with its own bold white letter, spelling exactly "FOM", with small equal white gaps. Letter F in the first tile, O in the second, M in the third. Match their recognizably geometric bold letter shapes closely to the brand reference.
+
+The overall avatar should immediately read as a FOM sales manager communicating with clients. This is a refined minimal brand icon, not an illustration or corporate photo.
+Use a solid pure white background. Crisp flat fills and clean edges, no textures or gradients, no shadows or 3D effects. Center the manager above the three FOM tiles and balance their visual weight. Keep the entire mark inside a safe central circle for Telegram cropping, with generous but not excessive margins. Make the red color noticeable and the icon and lettering readable at 48–64 pixels.
+Do not add "UZBEKISTAN", taglines, extra people, objects, buttons, watermarks, border rings or additional lettering. Deliver one polished finished square raster avatar.

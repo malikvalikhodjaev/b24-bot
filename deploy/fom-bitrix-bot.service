@@ -1,0 +1,22 @@
+[Unit]
+Description=FOM Bitrix Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/datfo-crm-bot
+ExecStart=%h/datfo-crm-bot/.venv/bin/python %h/datfo-crm-bot/run.py --sales-bot
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=FOM_BOT_EXECUTION=server
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+KillSignal=SIGINT
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

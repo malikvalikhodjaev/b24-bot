@@ -1,0 +1,41 @@
+{
+  "users": {},
+  "inn_lengths": [9],
+  "targets": {
+    "deal": {
+      "entity_type_id": 2,
+      "category_id": 45,
+      "responsible_id": null,
+      "fields": {
+        "title": "title",
+        "description": "comments",
+        "company_id": "companyId",
+        "responsible_id": "assignedById",
+        "request_id": "originId"
+      },
+      "defaults": {"opened": "N", "originatorId": "datfo_telegram"}
+    },
+    "pharmacy": {
+      "entity_type_id": 1034,
+      "category_id": 17,
+      "responsible_id": null,
+      "fields": {
+        "title": "title",
+        "company_id": "companyId",
+        "responsible_id": "assignedById",
+        "request_id": "xmlId",
+        "address": "UF_CRM_8_1719398485569",
+        "phone": "UF_CRM_8_1719398563749",
+        "manager_ids": "UF_CRM_8_1735795380"
+      },
+      "defaults": {"opened": "N"}
+    },
+    "support": {
+      "entity_type_id": null,
+      "category_id": null,
+      "responsible_id": null,
+      "fields": {},
+      "defaults": {"opened": "N"}
+    }
+  }
+}

@@ -1,0 +1,35 @@
+const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert/strict');
+const {chromium}=require('C:/Users/Lenovo/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const root=path.resolve(__dirname,'../webapp'),out=path.resolve(__dirname,'../data/support-contact-ui-qa-20261008');
+const reference=JSON.parse(fs.readFileSync(path.join(root,'reference.json'),'utf8'));
+fs.mkdirSync(out,{recursive:true});
+const allowed=new Set(['index.html','app.js','style.css','reference.json']);
+const server=http.createServer((req,res)=>{const name=new URL(req.url,'http://localhost').pathname.split('/').pop()||'index.html';if(!allowed.has(name)){res.writeHead(404);res.end();return;}res.writeHead(200,{'Content-Type':{'html':'text/html; charset=utf-8','js':'text/javascript; charset=utf-8','css':'text/css; charset=utf-8','json':'application/json; charset=utf-8'}[name.split('.').pop()]});res.end(fs.readFileSync(path.join(root,name)));});
+(async()=>{
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let browser;
+  try{
+    browser=await chromium.launch({headless:true});
+    const context=await browser.newContext({viewport:{width:390,height:844}});
+    await context.route('https://core.telegram.org/js/telegram-web-app.js',route=>route.fulfill({contentType:'text/javascript',body:''}));
+    await context.addInitScript(()=>{window.sent=[];window.Telegram={WebApp:{platform:'android',ready(){},expand(){},sendData(value){window.sent.push(JSON.parse(value));},MainButton:{show(){},setText(){},showProgress(){},hideProgress(){},onClick(fn){window.mainClick=fn;}}}};});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    async function open(mode='support'){await page.goto('http://127.0.0.1:'+server.address().port+'/?mode='+mode+'&lang=ru&token=qa-support-contact');await page.waitForFunction(()=>document.querySelector('[name=business_region]').options.length>1);}
+    async function existing(){await open();await page.locator('[name=pharmacy_kind][value=existing]').check();await page.locator('[name=fom_id]').fill('00081');await page.locator('#unknownType').click();await page.locator('[name=request_description]').fill('Нужно связаться с управляющим и проверить подключение.');}
+    async function noOverflow(){assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
+    async function person(){await page.locator('[name=support_contact][value=person]').check();await page.locator('[name=support_contact_name]').fill('Азиз');await page.locator('[name=support_contact_phone]').fill('90 123 45 67');}
+    await existing();assert.equal(await page.locator('#supportContact').isVisible(),true);assert.equal(await page.locator('[name=support_contact][value=pharmacy]').isChecked(),true);assert.equal(await page.locator('#supportContactFields').isVisible(),false);assert.equal(await page.locator('[name=support_contact_name]').isDisabled(),true);
+    await page.locator('[name=support_contact][value=person]').check();await page.locator('form [type=submit]').click();assert.equal(await page.evaluate(()=>window.sent.length),0);assert.equal(await page.locator('[name=support_contact_name]').evaluate(node=>node.required),true);
+    await person();await page.locator('#language').click();assert.match(await page.locator('#supportContact h2').innerText(),/боғланиш/);assert.equal(await page.locator('[name=support_contact_name]').inputValue(),'Азиз');assert.equal(await page.locator('[name=support_contact][value=person]').isChecked(),true);await page.locator('#language').click();
+    await page.screenshot({path:path.join(out,'mobile-contact-person.png'),fullPage:true});await noOverflow();
+    await page.evaluate(()=>{window.mainClick();window.mainClick();});let sent=await page.evaluate(()=>window.sent);assert.equal(sent.length,1);assert.equal(sent[0].support_contact,'person');assert.equal(sent[0].support_contact_name,'Азиз');assert.equal(sent[0].support_contact_phone,'90 123 45 67');assert.equal(sent[0].fom_id,'00081');assert.equal(sent[0].create_contact,false);
+    await existing();await person();await page.locator('[name=support_contact][value=pharmacy]').check();await page.screenshot({path:path.join(out,'mobile-pharmacy-contacts.png'),fullPage:true});await page.locator('form [type=submit]').click();sent=await page.evaluate(()=>window.sent);assert.equal(sent[0].support_contact,'pharmacy');assert.equal(sent[0].support_contact_name,'');assert.equal(sent[0].support_contact_phone,'');
+    await existing();await person();await page.locator('[name=pharmacy_kind][value=new]').check();assert.equal(await page.locator('#pharmacyContactConsent').isVisible(),false);assert.equal(await page.locator('[name=create_contact]').isDisabled(),true);
+    const region=reference.regions.find(row=>reference.cities[row.id]?.length);await page.locator('[name=title]').fill('Аптека');await page.locator('[name=inn]').fill('123456789');await page.locator('[name=company_name]').fill('Фирма');await page.locator('[name=business_region]').selectOption(String(region.id));await page.locator('[name=city]').selectOption(String(reference.cities[region.id][0].id));await page.locator('[name=program]').selectOption(String(reference.programs[0].id));await page.locator('[name=address]').fill('Улица, 1');await page.locator('[name=phone]').fill('909876543');await page.locator('form [type=submit]').click();sent=await page.evaluate(()=>window.sent);assert.equal(sent[0].pharmacy_kind,'new');assert.equal(sent[0].create_contact,false);assert.equal(sent[0].phone,'909876543');assert.equal(sent[0].support_contact_name,'Азиз');
+    await page.setViewportSize({width:1280,height:900});await existing();await person();await page.screenshot({path:path.join(out,'desktop-contact-person.png'),fullPage:true});await noOverflow();
+    await open('deal');assert.equal(await page.locator('#supportContact').isVisible(),false);assert.equal(await page.locator('[name=support_contact_name]').isDisabled(),true);
+    await open('pharmacy');assert.equal(await page.locator('#supportContact').isVisible(),false);await page.locator('[name=create_contact]').check();assert.equal(await page.locator('#newContact').isVisible(),true);
+    assert.deepEqual(errors,[]);
+    fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:true,viewports:[390,1280],checks:['default pharmacy contacts without new contact','person name and phone required','language switch preserves person data','existing and new pharmacy both support person','new support form has one contact-creation consent','switching back ignores hidden personal fields','person data sent once','deal and pharmacy modes preserved','no overflow or browser errors']},null,2));
+    console.log('Support contact UI: passed on mobile 390px and desktop 1280px');
+  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
+})().catch(error=>{console.error(error);process.exitCode=1;});
