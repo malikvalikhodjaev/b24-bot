@@ -13,7 +13,7 @@ from datfo_crm_bot.registration import PROFILE
 from datfo_crm_bot.role_access import RoleAccess
 from datfo_crm_bot.service import DEAL, SUPPORT
 from datfo_crm_bot.support_statistics import show as support_stats
-from datfo_crm_bot.work_inbox import STATS as TECH_STATS
+from datfo_crm_bot.work_inbox import INBOX, STATS as TECH_STATS
 
 
 class RoleWorkflowTests(unittest.TestCase):
@@ -39,7 +39,9 @@ class RoleWorkflowTests(unittest.TestCase):
             with language_context(language):
                 self.assertIn(MY_STATS,self.labels(200))
                 self.assertNotIn(TECH_STATS,self.labels(200))
+                self.assertNotIn(INBOX,self.labels(200))
                 self.assertIn(TECH_STATS,self.labels(300))
+                self.assertIn(INBOX,self.labels(300))
                 self.assertNotIn(MY_STATS,self.labels(300))
                 self.assertNotIn(DEAL,self.labels(300))
                 self.assertNotIn(SUPPORT,self.labels(300))
@@ -48,6 +50,7 @@ class RoleWorkflowTests(unittest.TestCase):
         technician={row['command'] for row in self.registration.command_menu(300,COMMANDS)}
         self.assertTrue({'deal','okb','my_stats'}<=manager)
         self.assertNotIn('requests_stats',manager)
+        self.assertNotIn('requests',manager)
         self.assertTrue({'requests','requests_stats','profile'}<=technician)
         self.assertFalse({'deal','okb','my_stats','stats','support'}&technician)
         self.store.grant(200,'off',100)
@@ -71,11 +74,18 @@ class RoleWorkflowTests(unittest.TestCase):
         self.assertFalse(guard.handle(self.callback('ld:list:support:0')))
 
     def test_stale_reply_keyboard_filters_actions_for_current_role(self):
-        raw=[[DEAL,SUPPORT],[MY_STATS,TECH_STATS],['🏪 Добавить аптеку в ОКБ']]
+        raw=[[DEAL,SUPPORT],[MY_STATS,TECH_STATS],[INBOX],['🏪 Добавить аптеку в ОКБ']]
         tech=self.registration.direct_form_keyboard(300,raw)
-        self.assertEqual(tech,[[TECH_STATS]])
+        self.assertEqual(tech,[[TECH_STATS],[INBOX]])
         sales=self.registration.direct_form_keyboard(200,raw)
         self.assertNotIn(TECH_STATS,str(sales))
+        self.assertNotIn(INBOX,str(sales))
+        for language in ('ru','uz'):
+            old=[[tr(INBOX,language)],['/requests']]
+            self.assertEqual(self.registration.direct_form_keyboard(200,old),[])
+            self.assertEqual(self.registration.direct_form_keyboard(300,old),old)
+        self.assertNotIn(INBOX,str(self.work.keyboard(200)))
+        self.assertIn(INBOX,str(self.work.keyboard(300)))
 
     def test_old_profile_alias_works_in_an_active_request_without_consuming_draft(self):
         raw=self.telegram

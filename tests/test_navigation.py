@@ -73,6 +73,7 @@ class NavigationTests(unittest.TestCase):
     def test_unknown_idle_text_does_not_show_profile_but_profile_still_works(self):
         self.say('Что-то непонятное')
         self.assertIn('Выберите раздел', self.raw.messages[-1][1])
+        self.assertNotIn('📥 Заявки в техподдержку', self.raw.messages[-1][1])
         self.assertNotIn('Б24 #133', self.raw.messages[-1][1])
         self.say('/profile')
         self.assertIn('Менеджер ФОМ · #133', self.raw.messages[-1][1])
@@ -82,6 +83,7 @@ class NavigationTests(unittest.TestCase):
         self.say('909754744', 300)
         response, keyboard = self.raw.messages[-1][1:]
         self.assertIn('Откройте нужную заявку', response)
+        self.assertIn('📥 Заявки в техподдержку', response)
         self.assertNotIn('Аптека в ОКБ', response)
         self.assertNotIn(OKB, str(keyboard))
         self.assertNotIn(tr(DEAL, 'ru'), str(keyboard))

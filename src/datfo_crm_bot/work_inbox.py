@@ -451,7 +451,9 @@ class WorkInbox:
         self.intake = SupportIntake(self)
 
     def keyboard(self, user):
-        rows = [[INBOX,MINE],[SENT],[DIAGNOSTICS]]
+        rows = [[MINE],[SENT],[DIAGNOSTICS]]
+        if self.registration.support_inbox_allowed(user):
+            rows[0].insert(0,INBOX)
         if self.registration.support_statistics_allowed(user):
             rows.insert(2,[STATS])
         if self.store.role(user)=='fom_sales':

@@ -117,7 +117,7 @@ def menu_text(registration=None, user=None, *, cancelled=False, text=''):
         lines += [phrase('sales'), phrase('support')]
     if sales and (not registration or registration.okb_enabled):
         lines += [phrase('okb')]
-    if registration and registration.work_inbox:
+    if registration and registration.support_inbox_allowed(user):
         lines += [phrase('inbox')]
     if not registration or registration.live_deals_enabled:
         lines += [phrase('crm')]

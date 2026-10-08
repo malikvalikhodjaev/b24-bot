@@ -91,13 +91,15 @@ class Registration:
         if keyboard is not None and work and self.user(telegram_id):
             from .service import DEAL_LABELS, SUPPORT_LABELS, PHARMACY, STATS
             from .okb_service import OKB_LABELS
-            from .work_inbox import NEW, STATS as SUPPORT_STATS
+            from .work_inbox import NEW, INBOX, OLD_LABELS, STATS as SUPPORT_STATS
             from .personal_statistics import MY_STATS
             blocked = set()
             if not self.sales_allowed(telegram_id):
                 blocked |= {*DEAL_LABELS,*SUPPORT_LABELS,*OKB_LABELS,PHARMACY,STATS,MY_STATS,NEW,'/deal','/support','/okb','/pharmacy','/stats','/my_stats'}
             if not self.support_statistics_allowed(telegram_id):
                 blocked |= {SUPPORT_STATS,'/requests_stats'}
+            if not self.support_inbox_allowed(telegram_id):
+                blocked |= {INBOX, '/requests', *(label for label, action in OLD_LABELS.items() if action == INBOX)}
             blocked = {tr(label,language) for label in blocked for language in (None,'ru','uz')}
             keyboard = [[button for button in row if (button if isinstance(button,str) else button.get('text')) not in blocked] for row in keyboard]
             keyboard = [row for row in keyboard if row]
@@ -170,15 +172,20 @@ class Registration:
     def sales_allowed(self, user):
         return bool(self.user(user)) and (not self.work_inbox or self.work_inbox.store.role(user) == 'fom_sales')
 
-    def support_statistics_allowed(self, user):
+    def support_inbox_allowed(self, user):
         return bool(self.user(user) and self.work_inbox and self.work_inbox.store.role(user) in {'tech', 'trainer', 'dispatcher'})
+
+    def support_statistics_allowed(self, user):
+        return self.support_inbox_allowed(user)
 
     def command_menu(self, user, commands):
         common = {'start','profile','settings','language','help','guide','next','whoami','register','cancel','pending'}
         if self.user(user):
             common |= {'my_crm','reminders','request_cancel'}
             if self.work_inbox and self.work_inbox.store.role(user):
-                common |= {'requests','requests_mine','requests_sent','request_ticket','diagnostics'}
+                common |= {'requests_mine','requests_sent','request_ticket','diagnostics'}
+            if self.support_inbox_allowed(user):
+                common |= {'requests'}
             if self.sales_allowed(user):
                 common |= {'deal','pharmacy','okb','support','request','stats','my_stats','crm_deal'}
             elif self.support_statistics_allowed(user):
@@ -224,7 +231,7 @@ class Registration:
         if self.personal_statistics_enabled and sales:
             from .personal_statistics import MY_STATS
             okb += [[MY_STATS]]
-        if self.work_inbox and self.user(telegram_id) and self.work_inbox.store.role(telegram_id):
+        if self.support_inbox_allowed(telegram_id):
             from .work_inbox import INBOX, STATS
             okb += [[INBOX]]
             if self.support_statistics_allowed(telegram_id):
