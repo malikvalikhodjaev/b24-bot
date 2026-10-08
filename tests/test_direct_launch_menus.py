@@ -110,7 +110,7 @@ class DirectLaunchMenuTests(unittest.TestCase):
     def test_unapproved_and_other_roles_do_not_receive_authorized_form_links(self):
         for user in (300, 400, 600):
             self.telegram.send(user, 'Меню', [[DEAL, SUPPORT]])
-            self.assertEqual(self.raw.messages[-1][2], [] if user in (300,400) else [[DEAL, SUPPORT]])
+            self.assertEqual(self.raw.messages[-1][2], self.registration.keyboard(user) if user in (300,400) else [[DEAL, SUPPORT]])
         self.primary.deny_registration(200, 100, 'revoked')
         self.telegram.send(200, 'Меню', [[DEAL, SUPPORT]])
         self.assertEqual(self.raw.messages[-1][2], [[DEAL, SUPPORT]])

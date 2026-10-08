@@ -1,4 +1,7 @@
 from .i18n import tr
+import json
+from .api import RemoteError
+from .config import ConfigError
 from .okb_service import OKB, OKB_LABELS, CONTINUE, OkbBot
 from .service import CANCEL, CHECK, MENU, PHARMACY, STATS, DEAL_LABELS, SUPPORT_LABELS
 from .guidance import form_hint, with_guide
@@ -37,6 +40,15 @@ class OkbAccess:
         text = text.strip() if isinstance(text, str) else ""
         command = text.split(maxsplit=1)[0].split("@", 1)[0].lower() if text.startswith("/") else text
         state = self.registration.store.session(user_id)
+        web_pharmacy = None
+        web_data = message.get('web_app_data')
+        if isinstance(web_data, dict) and isinstance(web_data.get('data'), str) and len(web_data['data'].encode('utf-8')) <= 4096:
+            try:
+                parsed = json.loads(web_data['data'])
+                if isinstance(parsed, dict) and parsed.get('mode') == 'pharmacy':
+                    web_pharmacy = parsed
+            except ValueError:
+                pass
         commands = {"/okb", "/pharmacy", *OKB_LABELS, PHARMACY, "/stats", STATS}
         if any(self.registration.store.operation(row['request_id'])['value'].get('workflow') == 'okb'
                for row in self.registration.store.unfinished(user_id)):
@@ -45,7 +57,7 @@ class OkbAccess:
         admin_commands = {"/register", "/profile", "/registrations", "/members", "/approve", "/reject", "/revoke", *PROFILE_LABELS, "Заявки менеджеров", "Подключённые менеджеры"}
         if command in admin_commands:
             return False
-        if command not in commands and not state:
+        if command not in commands and not state and web_pharmacy is None:
             return False
         user = self.registration.user(user_id)
         if not user:
@@ -62,5 +74,31 @@ class OkbAccess:
             self.telegram.send(user_id, tr("Продажи и поддержка ожидают выбора воронок. Доступно добавление аптеки в ОКБ."), [[OKB]])
             return True
         self.bot.config.users[user_id] = user
+        if web_pharmacy is not None:
+            from .input_forms import launch_matches, consume_launch
+            from .navigation import phrase
+            fresh = not state or state.get('workflow') != 'okb' or state.get('request_id') != web_pharmacy.get('token')
+            if fresh:
+                work = self.registration.work_inbox
+                if (self.registration.store.unfinished(user_id) or
+                        (state and state.get('step') not in {'done', 'stats_scope', 'stats_period'}) or
+                        (work and work.store.session(user_id))):
+                    self.telegram.send(user_id, phrase('active'), self.registration.keyboard(user_id))
+                    return True
+                if not launch_matches(self.registration.store, user_id, 'pharmacy', web_pharmacy.get('token')):
+                    self.telegram.send(user_id, tr('Эта форма уже закрыта. Откройте новую форму через меню.'), self.registration.more_keyboard(user_id))
+                    return True
+                self.telegram.send(user_id, phrase('pharmacy_processing'))
+                try:
+                    self.bot.crm.validate_okb()
+                except ConfigError:
+                    self.telegram.send(user_id, tr('Этот процесс ещё не настроен в Б24. Сообщите администратору.'), self.registration.more_keyboard(user_id))
+                    return True
+                except RemoteError:
+                    self.telegram.send(user_id, tr('Б24 сейчас недоступен. Откройте форму ещё раз.'), self.registration.more_keyboard(user_id))
+                    return True
+                state = {'kind': 'pharmacy', 'workflow': 'okb', 'step': 'okb_bulk_input', 'request_id': web_pharmacy['token']}
+                self.registration.store.set_session(user_id, state)
+                consume_launch(self.registration.store, user_id, 'pharmacy', web_pharmacy['token'])
         self.bot.handle(update)
         return True

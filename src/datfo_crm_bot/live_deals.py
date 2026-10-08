@@ -20,8 +20,8 @@ SALES_CATEGORY = 45
 RESTART_DEAL = 'Начать новую форму сделки'
 REAL_TEST = '🧪 Б24га ёзиб синаш'
 END_TEST = '🏁 Б24 синовидан чиқиш'
-MY_CRM = '📂 Мои дела'
-MY_CRM_LABELS = {MY_CRM, '📂 Б24 ёзувларим', '📂 Б24 заявкаларим/сделкаларимни кўриш'}
+MY_CRM = '📂 Мои сделки и заявки'
+MY_CRM_LABELS = {MY_CRM, '📂 Мои заявки', '📂 Мои дела', '📂 Б24 ёзувларим', '📂 Б24 заявкаларим/сделкаларимни кўриш'}
 TEST_PREFIX = '[ТЕСТ БОТА] '
 MENU = with_guide([[DEAL, SUPPORT], [MY_CRM]])
 FIELDS = {'title':'title', 'company_id':'companyId', 'responsible_id':'assignedById',
@@ -439,7 +439,10 @@ class LiveDeals:
         web_deal = False
         if isinstance(web_data,dict) and isinstance(web_data.get('data'),str) and len(web_data['data'].encode('utf-8'))<=4096:
             try:
-                web_deal = json.loads(web_data['data']).get('mode')=='deal'
+                parsed = json.loads(web_data['data'])
+                if isinstance(parsed, dict) and parsed.get('mode') == 'pharmacy':
+                    return False
+                web_deal = parsed.get('mode')=='deal'
             except (ValueError,AttributeError):
                 pass
         if not callback and not web_deal and command not in commands and (not state or state.get('workflow') != 'live_deal'):

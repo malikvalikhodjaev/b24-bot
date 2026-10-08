@@ -297,7 +297,9 @@ class Reminders:
                 self.db.execute('DELETE FROM crm_reminder_inputs WHERE user_id=?', (user,))
             if command != '/reminders':
                 return False
-        menu_labels = {button for buttons in self.registration.keyboard(user) for button in buttons if isinstance(button, str)}
+        from .navigation import HOME
+        menus = self.registration.keyboard(user) + self.registration.more_keyboard(user)
+        menu_labels = {button for buttons in menus for button in buttons if isinstance(button, str)} | {HOME}
         if not callback and pending and text in menu_labels and text not in {REMINDERS, TEXTS['menu']['uz']}:
             with self.db:
                 self.db.execute('DELETE FROM crm_reminder_inputs WHERE user_id=?', (user,))
@@ -315,6 +317,8 @@ class Reminders:
                         raise
                 if self.snooze.handle(user, data):
                     pass
+                elif data == 'rm:list':
+                    self.listing(user)
                 elif data=='rm:cancel':
                     self.cancel_comment(user)
                 elif match := re.fullmatch(r'rm:(card|complete|comment):(\d+)', data):

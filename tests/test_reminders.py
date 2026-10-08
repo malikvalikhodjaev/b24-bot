@@ -301,6 +301,21 @@ class ReminderTests(unittest.TestCase):
         self.assertIn('Напоминание',self.inline()[0]['text'])
         self.assertFalse(any(method=='crm.activity.update' for method,_ in self.api.calls))
 
+    def test_reminders_from_personal_hub_show_only_current_users_items(self):
+        from datfo_crm_bot.crm_list import hub
+        hub(self.live, 100)
+        buttons = self.inline()[-1]['reply_markup']['inline_keyboard']
+        self.assertTrue(any(button['callback_data'] == 'rm:list' for row in buttons for button in row))
+        self.telegram.calls.clear()
+        self.assertTrue(self.press('list'))
+        self.assertIn('Напоминание', self.inline()[-1]['text'])
+        self.assertFalse(any(method == 'crm.activity.update' for method, _ in self.api.calls))
+        self.telegram.calls.clear()
+        self.telegram.messages.clear()
+        self.assertTrue(self.press('list', 200))
+        self.assertEqual(self.inline(), [])
+        self.assertIn('нет', self.telegram.messages[-1][1].lower())
+
 
 if __name__=='__main__':
     unittest.main()

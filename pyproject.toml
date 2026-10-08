@@ -1,6 +1,6 @@
 [project]
 name = "datfo-crm-bot"
-version = "0.2.2"
+version = "0.2.3"
 description = "Telegram forms for Datfo deals, pharmacies and support in Bitrix24"
 requires-python = ">=3.11"
 dependencies = []

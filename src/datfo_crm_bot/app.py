@@ -41,7 +41,6 @@ COMMANDS = [{"command": command, "description": description} for command, descri
     ("my_stats", "Моя краткая статистика: бот и Б24"),
     ("cancel", "Отменить черновик"), ("whoami", "Ваш Telegram ID"), ("help", "Помощь по ролям"),
     ("guide", "Помощь по ролям"), ("next", "Подсказка для текущего шага"),
-    ("settings", "Настройки и язык"), ("language", "Выбрать язык"),
     ("register", "Подключиться к Datfo Sales"), ("profile", "👤 Мой профиль"),
     ("registrations", "Заявки менеджеров, для Малика"), ("members", "Подключённая команда, для Малика"),
     ("test", "Тест без записи в Б24, для Малика"), ("endtest", "Завершить симуляцию"))]
@@ -50,7 +49,7 @@ COMMANDS.extend([{"command":"inbox_test","description":"Тест инбокса 
                  {"command":"end_inbox_test","description":"Завершить тест инбокса"}])
 COMMANDS.extend([{'command':'b24_test','description':'Тест с настоящими записями Б24'},
                  {'command':'end_b24_test','description':'Закончить тест с записью Б24'},
-                 {'command':'my_crm','description':'📂 Мои дела'},
+                 {'command':'my_crm','description':'📂 Мои сделки и заявки'},
                  {'command':'reminders','description':'Мои напоминания'},
                  {'command':'crm_deal','description':'Открыть созданную ботом запись Б24'}])
 COMMANDS.extend([{'command':command,'description':description} for command,description in (

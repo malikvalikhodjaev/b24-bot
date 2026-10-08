@@ -22,7 +22,12 @@ def hub(live, user, message_id=None):
     if live.registration.sales_allowed(user):
         buttons.append([{'text':tr(TEXTS['deals']['ru']), 'callback_data':'ld:list:deal:0'}])
     buttons.append([{'text':tr(TEXTS['requests']['ru']), 'callback_data':'ld:list:support:0'}])
-    return deliver(live,user,tr(TEXTS['tasks_heading']['ru'])+'\n\n'+tr(TEXTS['tasks_hint']['ru']),buttons,message_id)
+    if getattr(live, 'reminders', None):
+        from .reminders import REMINDERS
+        buttons.append([{'text': tr(REMINDERS), 'callback_data': 'rm:list'}])
+    heading = 'tasks_heading' if live.registration.sales_allowed(user) else 'tasks_tech_heading'
+    hint = 'tasks_hint' if live.registration.sales_allowed(user) else 'tasks_tech_hint'
+    return deliver(live,user,tr(TEXTS[heading]['ru'])+'\n\n'+tr(TEXTS[hint]['ru']),buttons,message_id)
 
 
 def show(live,user,member,page=0,message_id=None,scope='deal'):
@@ -93,6 +98,7 @@ def show(live,user,member,page=0,message_id=None,scope='deal'):
         navigation.append({'text':'➡️','callback_data':'ld:list:'+scope+':'+str(page+1)})
     if navigation:
         buttons.append(navigation)
-    buttons.append([{'text':tr(TEXTS['back_tasks']['ru']),'callback_data':'ld:hub'}])
+    back = 'back_tasks' if live.registration.sales_allowed(user) else 'back_tasks_tech'
+    buttons.append([{'text':tr(TEXTS[back]['ru']),'callback_data':'ld:hub'}])
     text+=tr('Выберите строку ниже, чтобы посмотреть карточку и действия.')
     return deliver(live,user,text,buttons,message_id)

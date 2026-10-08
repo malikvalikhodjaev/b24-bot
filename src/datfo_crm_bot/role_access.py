@@ -22,6 +22,8 @@ class RoleAccess:
         from .okb_service import OKB_LABELS, CONTINUE
         from .work_inbox import NEW, STATS as SUPPORT_STATS
         from .personal_statistics import MY_STATS
+        from .live_deals import MY_CRM
+        from .navigation import MORE
         text = str(message.get('text') or '').strip() if not callback else ''
         command = text.split(maxsplit=1)[0].split('@',1)[0].lower() if text.startswith('/') else text
         sales_actions = {'/deal','/support','/request','/okb','/pharmacy','/stats','/my_stats','/crm_deal',
@@ -46,7 +48,7 @@ class RoleAccess:
                 '/approve','/reject','/revoke','/registrations','/members','/inbox_role','/inbox_team'}:
             # Viewing other role sections never resumes an old sales form.
             denied_sales |= bool(text and not command.startswith('/') and command not in {
-                '👤 Мой профиль','📂 Мои дела','🏠 Главное меню',SUPPORT_STATS,
+                '👤 Мой профиль','📂 Мои дела',MY_CRM,MORE,'🏠 Главное меню',SUPPORT_STATS,
                 '📥 Техник ёрдам заявкалари','📌 Менга тайинланган','📤 Юборган заявкаларим','🔔 Мои напоминания'})
         denied_support = (command in {'/requests_stats', SUPPORT_STATS} or data.startswith('wr:stats:')) and not registration.support_statistics_allowed(user)
         if not denied_sales and not denied_support:

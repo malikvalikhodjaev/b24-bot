@@ -8,6 +8,7 @@ from .i18n import tr
 from .navigation_content import TEXTS
 
 HOME = '🏠 Главное меню'
+MORE = '☰ Ещё'
 
 
 def phrase(key):
@@ -146,12 +147,15 @@ class Navigation:
         sections = {DEAL, PHARMACY, SUPPORT, OKB, STATS, MY_CRM, NEW, INBOX, MINE, SENT, REQUEST_STATS,
                     '/deal', '/support', '/request', '/pharmacy', '/okb', '/stats', '/my_crm',
                     '/requests', '/requests_mine', '/requests_sent', '/requests_stats'}
-        if command not in {HOME, '/menu', '/start'} | sections and not cancelled:
+        if command not in {HOME, MORE, '/menu', '/start'} | sections and not cancelled:
             return False
         if not self.registration.user(user) or self.registration.store.registration_session(user):
             return False
         if ((self.simulation and self.simulation.active(user)) or (self.inbox and self.inbox.store.mode(user))):
             return False
+        if command == MORE:
+            self.telegram.send(user, phrase('more_heading'), self.registration.more_keyboard(user))
+            return True
         store = self.registration.store
         # Keep this guard even if a crash lost the active session.
         if store.unfinished(user):

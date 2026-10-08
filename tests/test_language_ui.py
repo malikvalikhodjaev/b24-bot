@@ -75,7 +75,8 @@ class LanguageFlowTests(unittest.TestCase):
         self.say('/next')
         self.assertIn('Заявка мавзусини',self.raw.calls[-1][1]['text'])
         self.assertEqual(self.store.session(200),support)
-        self.assertIn([tr(SUPPORT,'uz')],[[(b['text'] if isinstance(b,dict) else b)] for row in self.raw.messages[-1][2] for b in row])
+        self.assertIn([RU, UZ], self.raw.messages[-1][2])
+        self.assertNotIn(['/start'], self.raw.messages[-1][2])
 
     def test_translated_support_buttons_complete_once_in_russian_and_uzbek(self):
         for lang in ('ru','uz'):
@@ -118,7 +119,7 @@ class LanguageFlowTests(unittest.TestCase):
         labels=[b['text'] if isinstance(b,dict) else b for row in self.raw.messages[-1][2] for b in row]
         self.assertIn('➕ Открыть сделку',labels)
         self.assertIn('🛠 Открыть заявку в техподдержку',labels)
-        self.assertIn('📂 Мои дела',labels)
+        self.assertIn('📂 Мои сделки и заявки',labels)
         self.say('/start',300)
         labels=[b['text'] if isinstance(b,dict) else b for row in self.raw.messages[-1][2] for b in row]
         self.assertNotIn(DEAL,labels); self.assertNotIn(SUPPORT,labels)
@@ -139,7 +140,7 @@ class LanguageFlowTests(unittest.TestCase):
         self.set_language(200,'ru')
         row=self.ticket(300)
         self.say(tr(MY_CRM,'ru'))
-        self.assertIn('Мои дела',self.raw.calls[-1][1]['text'])
+        self.assertIn('Мои сделки и заявки',self.raw.calls[-1][1]['text'])
         self.live.handle({'callback_query':{'id':'deals','from':{'id':200},'message':{'chat':{'id':200,'type':'private'}},'data':'ld:list:deal:0'}})
         self.assertTrue(any(m=='crm.item.get' for m,_ in self.api.calls))
         self.live.handle({'callback_query':{'id':'requests','from':{'id':200},'message':{'chat':{'id':200,'type':'private'}},'data':'ld:list:support:0'}})

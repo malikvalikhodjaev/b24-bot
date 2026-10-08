@@ -132,7 +132,7 @@ class PersonalStatisticsTests(unittest.TestCase):
             labels = [button['text'] for row in card['reply_markup']['inline_keyboard'] for button in row]
             self.assertIn(tr('🔄 Обновить', language), labels)
             menu = [button['text'] if isinstance(button, dict) else button
-                    for row in self.registration.keyboard(user) for button in row]
+                    for row in self.registration.more_keyboard(user) for button in row]
             self.assertIn(MY_STATS, menu)
         self.assertNotIn(MY_STATS, [b for row in self.registration.keyboard(600) for b in row])
 

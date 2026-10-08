@@ -9,7 +9,7 @@ from datfo_crm_bot.app import dispatch
 from datfo_crm_bot.demo import demo_config
 from datfo_crm_bot.i18n import LocalizedTelegram, tr
 from datfo_crm_bot.language_ui import LanguageUI
-from datfo_crm_bot.navigation import HOME, Navigation
+from datfo_crm_bot.navigation import HOME, MORE, Navigation
 from datfo_crm_bot.okb_access import OkbAccess
 from datfo_crm_bot.okb_service import OKB, CREATE_CONTACT, USE_CONTACT_PHONE
 from datfo_crm_bot.service import CANCEL, DEAL, SUPPORT
@@ -60,6 +60,8 @@ class NavigationTests(unittest.TestCase):
         self.say(CANCEL)
         self.assertIsNone(self.primary.session(200))
         self.assertIn('Форма закрыта', self.raw.messages[-1][1])
+        self.assertIn(MORE, str(self.raw.messages[-1][2]))
+        self.say(MORE)
         self.assertIn(OKB, str(self.raw.messages[-1][2]))
         self.say('909754744')
         response = self.raw.messages[-1][1]

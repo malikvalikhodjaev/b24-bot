@@ -93,6 +93,24 @@ class Registration:
             from .okb_service import OKB_LABELS
             from .work_inbox import NEW, INBOX, OLD_LABELS, STATS as SUPPORT_STATS
             from .personal_statistics import MY_STATS
+            from .live_deals import MY_CRM_LABELS
+            from .reminders import REMINDERS
+            from .language_ui import SETTINGS
+            from .guidance import GUIDE_LABELS
+            known = {*DEAL_LABELS, *SUPPORT_LABELS, *OKB_LABELS, *MY_CRM_LABELS, *PROFILE_LABELS,
+                     *GUIDE_LABELS, PHARMACY, STATS, MY_STATS, REMINDERS, SETTINGS, INBOX, SUPPORT_STATS,
+                     *(label for label, action in OLD_LABELS.items() if action == INBOX)}
+            renderings = lambda labels: {tr(label, language) for label in labels for language in (None, 'ru', 'uz')}
+            shown = {button if isinstance(button, str) else button.get('text') for row in keyboard for button in row}
+            old_main = shown <= renderings(known) and (
+                (shown & renderings(DEAL_LABELS) and shown & renderings(SUPPORT_LABELS)) or
+                (shown & renderings(MY_CRM_LABELS) and shown & renderings(PROFILE_LABELS)))
+            test_mode = self.store.db.execute('SELECT value FROM settings WHERE key=?',
+                                             ('b24-test:' + str(telegram_id),)).fetchone()
+            if (old_main and self.live_deals_enabled and not (test_mode and test_mode[0] == '1') and
+                    not (work.simulation and work.simulation.active(telegram_id)) and
+                    not (work.test_inbox and work.test_inbox.store.mode(telegram_id))):
+                return self.keyboard(telegram_id)
             blocked = set()
             if not self.sales_allowed(telegram_id):
                 blocked |= {*DEAL_LABELS,*SUPPORT_LABELS,*OKB_LABELS,PHARMACY,STATS,MY_STATS,NEW,'/deal','/support','/okb','/pharmacy','/stats','/my_stats'}
@@ -113,10 +131,12 @@ class Registration:
                                          ('b24-test:' + str(telegram_id),)).fetchone()
         if test_mode and test_mode[0] == '1':
             return keyboard
-        from .service import DEAL_LABELS, SUPPORT_LABELS
+        from .service import DEAL_LABELS, SUPPORT_LABELS, PHARMACY
+        from .okb_service import OKB_LABELS
         from .work_inbox import NEW
         labels = {tr(label, language): mode
-                  for mode, values in (('deal', DEAL_LABELS), ('support', SUPPORT_LABELS | {NEW}))
+                  for mode, values in (('deal', DEAL_LABELS), ('support', SUPPORT_LABELS | {NEW}),
+                                       ('pharmacy', OKB_LABELS | {PHARMACY}))
                   for label in values for language in (None, 'ru', 'uz')}
         rows = []
         for row in keyboard:
@@ -142,6 +162,10 @@ class Registration:
             session = getattr(self.work_inbox.store, 'session', None)
             draft = session(telegram_id) if callable(session) else None
             if draft and draft.get('web_intake') and draft.get('step') == 'web_form':
+                state = draft
+        elif mode == 'pharmacy':
+            draft = self.store.session(telegram_id)
+            if draft and draft.get('workflow') == 'okb' and draft.get('step') == 'okb_bulk_input':
                 state = draft
         if state:
             rows = form_keyboard(state, self.store, telegram_id)
@@ -179,7 +203,7 @@ class Registration:
         return self.support_inbox_allowed(user)
 
     def command_menu(self, user, commands):
-        common = {'start','profile','settings','language','help','guide','next','whoami','register','cancel','pending'}
+        common = {'start','profile','help','guide','next','whoami','register','cancel','pending'}
         if self.user(user):
             common |= {'my_crm','reminders','request_cancel'}
             if self.work_inbox and self.work_inbox.store.role(user):
@@ -190,7 +214,10 @@ class Registration:
                 common |= {'deal','pharmacy','okb','support','request','stats','my_stats','crm_deal'}
             elif self.support_statistics_allowed(user):
                 common |= {'requests_stats'}
-        return [row for row in commands if row['command'] in common]
+        from .role_content import TEXTS
+        return [{**row, 'description': TEXTS['tasks_tech']['ru']}
+                if row['command'] == 'my_crm' and self.user(user) and not self.sales_allowed(user) else row
+                for row in commands if row['command'] in common]
 
     def refresh_commands(self, user):
         if self.commands is None or not callable(getattr(self.telegram, 'call', None)):
@@ -216,33 +243,51 @@ class Registration:
                 raise
 
     def keyboard(self, telegram_id: int) -> list[list[str]]:
-        from .language_ui import SETTINGS
-        role = self.work_inbox.store.role(telegram_id) if self.work_inbox else None
+        from .navigation import MORE
+        if not self.user(telegram_id):
+            return with_guide([[REGISTER], [PROFILE]])
         sales = self.sales_allowed(telegram_id)
-        okb = [[tr("🏪 Добавить аптеку в ОКБ")]] if self.okb_enabled and self.user(telegram_id) and sales else []
-        if self.live_deals_enabled and self.user(telegram_id):
-            from .live_deals import MY_CRM
-            from .reminders import REMINDERS
-            from .service import DEAL, SUPPORT
-            deal = self.form_action_button(telegram_id,'deal',DEAL) if sales else DEAL
-            support = self.form_action_button(telegram_id,'support',SUPPORT) if self.work_inbox and role=='fom_sales' else SUPPORT
-            okb = ([[deal, support]] if sales else []) + [[MY_CRM]] + okb
-            okb += [[REMINDERS]]
-        if self.personal_statistics_enabled and sales:
-            from .personal_statistics import MY_STATS
-            okb += [[MY_STATS]]
-        if self.support_inbox_allowed(telegram_id):
-            from .work_inbox import INBOX, STATS
-            okb += [[INBOX]]
-            if self.support_statistics_allowed(telegram_id):
-                okb += [[STATS]]
         rows = []
-        for row in okb:
-            if len(row) == 1 and rows and len(rows[-1]) == 1:
-                rows[-1].extend(row)
-            else:
-                rows.append(list(row))
-        return with_guide(rows + [[PROFILE, SETTINGS]] if self.user(telegram_id) else [[REGISTER], [PROFILE, SETTINGS]])
+        if self.live_deals_enabled:
+            from .live_deals import MY_CRM
+            from .service import DEAL, SUPPORT
+            if sales:
+                rows.append([self.form_action_button(telegram_id, 'deal', DEAL),
+                             self.form_action_button(telegram_id, 'support', SUPPORT) if self.work_inbox else SUPPORT])
+            from .role_content import TEXTS
+            rows.append([MY_CRM if sales else TEXTS['tasks_tech']['ru'], MORE])
+        else:
+            rows.append([PROFILE, MORE])
+        if self.support_inbox_allowed(telegram_id):
+            from .work_inbox import INBOX
+            rows = [[INBOX, rows[0][0]], [MORE]]
+        return rows
+
+    def more_keyboard(self, telegram_id):
+        from .guidance import GUIDE
+        from .navigation import HOME
+        if not self.user(telegram_id):
+            return self.keyboard(telegram_id)
+        rows = []
+        if self.live_deals_enabled and self.sales_allowed(telegram_id):
+            rows.append(self.keyboard(telegram_id)[0])
+        actions = []
+        if self.okb_enabled and self.sales_allowed(telegram_id):
+            from .okb_service import OKB
+            actions.append(self.form_action_button(telegram_id, 'pharmacy', OKB))
+        if self.personal_statistics_enabled and self.sales_allowed(telegram_id):
+            from .personal_statistics import MY_STATS
+            actions.append(MY_STATS)
+        if self.support_statistics_allowed(telegram_id):
+            from .work_inbox import STATS
+            actions.append(STATS)
+        rows.extend([actions[index:index + 2] for index in range(0, len(actions), 2)])
+        return rows + [[PROFILE, GUIDE], [HOME]]
+
+    def profile_keyboard(self, telegram_id):
+        from .language_ui import CHOICES
+        from .navigation import HOME
+        return [list(row) for row in CHOICES] + [[HOME]]
 
     def handle(self, update: dict, bot=None) -> None:
         message = update.get("message", {})
@@ -295,11 +340,18 @@ class Registration:
                 '\n' + tr(TEXTS['role']['ru']) + tr(TEXTS[role_key]['ru']))
         if user_id in self.settings.admins:
             text += '\n' + tr(TEXTS['admin']['ru'])
-        return text + '\n\n' + tr(TEXTS['profile_hint']['ru'])
+        from .i18n import stored_language
+        from .language_ui import RU, UZ
+        language = stored_language(self.store, user_id)
+        text += '\n\n' + tr(TEXTS['profile_language']['ru']) + (UZ if language == 'uz' else RU)
+        return text + '\n' + tr(TEXTS['profile_language_hint']['ru'])
 
     def route(self, user_id: int, chat_id: int, command: str, text: str):
         keyboard = self.keyboard(user_id)
         row = self.store.registration(user_id)
+        from .navigation import MORE, phrase
+        if command == MORE and self.user(user_id):
+            return phrase('more_heading'), self.more_keyboard(user_id)
         if command=='/admin':
             if not self.user(user_id) or user_id not in self.settings.admins:
                 return tr('Бошқарув администратор учун.'),keyboard
@@ -311,7 +363,7 @@ class Registration:
         if command == "/whoami":
             return ''.join([tr('Ваш Telegram ID: <code>'), format(user_id, ''), '</code>.']), keyboard
         if command in {"/profile", PROFILE}:
-            return self.profile(user_id), keyboard
+            return self.profile(user_id), self.profile_keyboard(user_id)
         if command in {"/registrations", REQUESTS, "/members", MEMBERS, "/approve", "/reject", "/revoke"}:
             if not self.user(user_id) or user_id not in self.settings.admins:
                 return tr("Управление регистрациями доступно Малику."), keyboard

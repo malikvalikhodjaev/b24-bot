@@ -14,6 +14,9 @@ def with_guide(keyboard):
     if keyboard is None:
         return None
     rows = [list(row) for row in keyboard]
+    from .navigation import MORE
+    if any(label in row for row in rows for label in (MORE, tr(MORE, 'uz'))):
+        return rows
     if not any(GUIDE in row for row in rows):
         rows.append([GUIDE])
     return rows

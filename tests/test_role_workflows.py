@@ -31,7 +31,8 @@ class RoleWorkflowTests(unittest.TestCase):
             'message':{'message_id':55,'chat':{'id':user,'type':'private'}},'data':data}}
 
     def labels(self,user):
-        return [button if isinstance(button,str) else button['text'] for row in self.registration.keyboard(user) for button in row]
+        menus = self.registration.keyboard(user) + self.registration.more_keyboard(user)
+        return [button if isinstance(button,str) else button['text'] for row in menus for button in row]
 
     def test_role_menus_and_commands_are_separate_in_both_languages(self):
         self.registration.okb_enabled=self.registration.personal_statistics_enabled=True
@@ -76,7 +77,8 @@ class RoleWorkflowTests(unittest.TestCase):
     def test_stale_reply_keyboard_filters_actions_for_current_role(self):
         raw=[[DEAL,SUPPORT],[MY_STATS,TECH_STATS],[INBOX],['🏪 Добавить аптеку в ОКБ']]
         tech=self.registration.direct_form_keyboard(300,raw)
-        self.assertEqual(tech,[[TECH_STATS],[INBOX]])
+        self.assertEqual(tech, self.registration.keyboard(300))
+        self.assertIn(TECH_STATS, str(self.registration.more_keyboard(300)))
         sales=self.registration.direct_form_keyboard(200,raw)
         self.assertNotIn(TECH_STATS,str(sales))
         self.assertNotIn(INBOX,str(sales))
