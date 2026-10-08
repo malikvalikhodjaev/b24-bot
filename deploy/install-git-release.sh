@@ -16,9 +16,9 @@ if [[ -e "$bot_root" || -L "$bot_root" ]]; then
   printf '%s\n' 'Existing bot checkout preserved. Use the update procedure in SERVER_RUNTIME.md.' >&2
   exit 1
 fi
-git clone --branch codex/fom-bot-runtime "$bundle_path" "$bot_root"
+git clone --branch main "$bundle_path" "$bot_root"
 chmod 700 "$bot_root"
-git -C "$bot_root" remote set-url origin https://github.com/malikvalikhodjaev/datfo-strategy.git
+git -C "$bot_root" remote set-url origin https://github.com/malikvalikhodjaev/b24-bot.git
 python_path=$(/usr/bin/python3 -c 'import json,pathlib; print(json.loads((pathlib.Path.home()/"fom-bot-runtime-installed.json").read_text())["python"])')
 case "$python_path" in /home/malik/.local/share/fom-bot-runtime/python/*/bin/python3.12) ;; *) exit 1 ;; esac
 "$python_path" -c 'import sys; from zoneinfo import ZoneInfo; assert sys.version_info >= (3, 11); ZoneInfo("Asia/Tashkent")'
