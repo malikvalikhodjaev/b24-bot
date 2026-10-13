@@ -19,7 +19,7 @@ class LanguageUI:
         if callable(bind):
             bind(registration)
         # Only actual reply buttons are aliases. CRM names and user text are untouched.
-        from .registration import REGISTER, PROFILE, PROFILE_LABELS, REQUESTS, MEMBERS, CANCEL as REG_CANCEL
+        from .registration import REGISTER, PROFILE, PROFILE_LABELS, REQUESTS, MEMBERS, REQUESTS_LABELS, MEMBERS_LABELS, CANCEL as REG_CANCEL
         from .service import DEAL, PHARMACY, SUPPORT, STATS, CANCEL, CONFIRM, CHECK, SKIP_INN, SKIP_PHONE, UNBOUND
         from .okb_service import OKB, OKB_LABELS, NO_LANDMARK, CONTINUE, CREATE_CONTACT, NO_CONTACT, USE_CONTACT_PHONE
         from .live_deals import MY_CRM, MY_CRM_LABELS, RESTART_DEAL
@@ -46,6 +46,8 @@ class LanguageUI:
         self.aliases.update({tr(label, language): OKB for label in OKB_LABELS for language in ('ru', 'uz')})
         self.aliases.update({tr(label, language): PROFILE for label in PROFILE_LABELS for language in ('ru','uz')})
         self.aliases.update({tr(label, language): MY_CRM for label in MY_CRM_LABELS for language in ('ru','uz')})
+        self.aliases.update({tr(label, language): '/registrations' for label in REQUESTS_LABELS for language in ('ru','uz')})
+        self.aliases.update({tr(label, language): '/members' for label in MEMBERS_LABELS for language in ('ru','uz')})
 
     def normalize(self, update):
         message = update.get('message')

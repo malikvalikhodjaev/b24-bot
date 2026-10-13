@@ -42,7 +42,7 @@ COMMANDS = [{"command": command, "description": description} for command, descri
     ("cancel", "Отменить черновик"), ("whoami", "Ваш Telegram ID"), ("help", "Помощь по ролям"),
     ("guide", "Помощь по ролям"), ("next", "Подсказка для текущего шага"),
     ("register", "Подключиться к Datfo Sales"), ("profile", "👤 Мой профиль"),
-    ("registrations", "Заявки менеджеров, для Малика"), ("members", "Подключённая команда, для Малика"),
+    ("registrations", "👥 Регистрации"), ("members", "👥 Пользователи бота"),
     ("test", "Тест без записи в Б24, для Малика"), ("endtest", "Завершить симуляцию"))]
 COMMANDS.append({"command": "okb", "description": "Добавить аптеку в ОКБ"})
 COMMANDS.extend([{"command":"inbox_test","description":"Тест инбокса и ролей, для Малика"},
@@ -61,7 +61,7 @@ COMMANDS.extend([{'command':command,'description':description} for command,descr
     ('inbox_role','Назначить роль участника, для Малика'), ('requests_resend','Повтор уведомлений, для Малика'))])
 COMMANDS = [row for row in COMMANDS if row['command'] not in {
     'test','endtest','inbox_test','end_inbox_test','b24_test','end_b24_test',
-    'registrations','members','inbox_team','inbox_role','requests_resend'}]
+    'inbox_team','inbox_role','requests_resend'}]
 
 
 def publish_commands(telegram, commands):
@@ -88,6 +88,8 @@ def dispatch_message(update, language_ui, handlers):
     sender = callback.get('from', {}) if isinstance(callback, dict) else update.get('message', {}).get('from', {})
     with language_context(stored_language(language_ui.store, sender.get('id'))):
         normalized = language_ui.normalize(update)
+        if language_ui.registration.notices.handle_callback(normalized):
+            return
         for handler in handlers:
             if handler(normalized):
                 break
@@ -144,7 +146,7 @@ def registration_only(*, check: bool = False, okb_enabled: bool = False) -> int:
                                   'requests_stats','diagnostics','inbox_team','inbox_role','requests_resend'})
             commands = [item for item in COMMANDS if item["command"] in available]
             registration.commands = commands
-            publish_commands(telegram, registration.command_menu(None, commands) if okb else commands)
+            publish_commands(telegram, registration.command_menu(None, commands))
             print("@fom_bitrix_bot: регистрация запущена. ОКБ: " + ("включено" if okb else "выключено") + ". Сделки: продажи KG / План. Заявки: отдельная форма поддержки.", flush=True)
             with simulation_for(registration, telegram) as simulation, inbox_test_for(registration,telegram,simulation) as inbox, ExitStack() as background_resources:
                 live = LiveDeals(registration,okb_config,Bitrix(webhook),telegram,simulation,inbox) if okb else None
@@ -173,9 +175,11 @@ def registration_only(*, check: bool = False, okb_enabled: bool = False) -> int:
                     try:
                         if background:
                             background.check()
+                        registration.notices.flush()
                         for update in telegram.updates(store.offset()):
                             handlers = [role_access.handle] + ([personal_stats.handle] if personal_stats else []) + ([reminders.handle] if reminders else []) + [guide.handle, navigation.handle] + ([work.handle] if work else []) + ([live.handle] if live else []) + [inbox.handle, simulation.handle] + ([okb.handle] if okb else []) + [registration.handle]
                             dispatch(update, language_ui, handlers)
+                            registration.notices.flush()
                             store.set_offset(int(update["update_id"]) + 1)
                         simulation.store.prune_deliveries(store.offset())
                         inbox.store.prune_updates(store.offset())
@@ -279,7 +283,7 @@ def run(config: Config, *, online_check: bool = False) -> int:
         store = Store(config.database)
         try:
             telegram = LocalizedTelegram(telegram, store)
-            publish_commands(telegram, COMMANDS)
+            publish_commands(telegram, [row for row in COMMANDS if row['command'] not in {'registrations','members'}])
             bot = OkbBot(config, store, crm, telegram)
             registration = None
             if (ROOT / "registration.json").exists():
@@ -305,6 +309,8 @@ def run(config: Config, *, online_check: bool = False) -> int:
                 try:
                     if background:
                         background.check()
+                    if registration:
+                        registration.notices.flush()
                     updates = telegram.updates(store.offset())
                     for update in updates:
                         if not isinstance(update, dict) or "update_id" not in update:
@@ -312,6 +318,7 @@ def run(config: Config, *, online_check: bool = False) -> int:
                         if registration:
                             handlers = ([personal_stats.handle] if personal_stats else []) + ([reminders.handle] if reminders else []) + ([guide.handle, navigation.handle] if guide else []) + ([work.handle] if work else []) + ([live.handle] if live else []) + ([inbox.handle] if inbox else []) + ([simulation.handle] if simulation else []) + [lambda value: registration.handle(value, bot)]
                             dispatch(update, language_ui, handlers)
+                            registration.notices.flush()
                         else:
                             bot.handle(update)
                         store.set_offset(int(update["update_id"]) + 1)

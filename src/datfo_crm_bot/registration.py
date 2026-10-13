@@ -17,8 +17,10 @@ from .navigation import menu_text
 REGISTER = "Зарегистрироваться"
 PROFILE = "👤 Мой профиль"
 PROFILE_LABELS = {PROFILE, "Моя регистрация"}
-REQUESTS = "Заявки менеджеров"
-MEMBERS = "Подключённые менеджеры"
+REQUESTS = "👥 Регистрации"
+MEMBERS = "👥 Пользователи бота"
+REQUESTS_LABELS = {REQUESTS, "Заявки менеджеров"}
+MEMBERS_LABELS = {MEMBERS, "Подключённые менеджеры"}
 CANCEL = "Отмена регистрации"
 
 
@@ -81,6 +83,8 @@ class Registration:
         self.work_inbox = None
         self.personal_statistics_enabled = False
         self.commands = None
+        from .registration_notices import RegistrationNotices
+        self.notices = RegistrationNotices(self)
         bind = getattr(telegram, 'bind_registration', None)
         if callable(bind):
             bind(self)
@@ -186,6 +190,7 @@ class Registration:
             self.store.request_registration(telegram_id, telegram_id, employee)
             if not self.store.approve_registration(telegram_id, telegram_id, employee):
                 raise ConfigError(tr("Учётная запись администратора уже привязана к другому Telegram ID"))
+        self.notices.recover()
 
     def user(self, telegram_id: int) -> User | None:
         row = self.store.registration(telegram_id)
@@ -206,6 +211,8 @@ class Registration:
         common = {'start','profile','help','guide','next','whoami','register','cancel','pending'}
         if self.user(user):
             common |= {'my_crm','reminders','request_cancel'}
+            if user in self.settings.admins:
+                common |= {'registrations','members'}
             if self.work_inbox and self.work_inbox.store.role(user):
                 common |= {'requests_mine','requests_sent','request_ticket','diagnostics'}
             if self.support_inbox_allowed(user):
@@ -287,9 +294,14 @@ class Registration:
     def profile_keyboard(self, telegram_id):
         from .language_ui import CHOICES
         from .navigation import HOME
-        return [list(row) for row in CHOICES] + [[HOME]]
+        rows = [list(row) for row in CHOICES]
+        if telegram_id in self.settings.admins and self.user(telegram_id):
+            rows.append([REQUESTS, MEMBERS])
+        return rows + [[HOME]]
 
     def handle(self, update: dict, bot=None) -> None:
+        if self.notices.handle_callback(update):
+            return True
         message = update.get("message", {})
         sender, chat = message.get("from", {}), message.get("chat", {})
         if chat.get("type") != "private" or sender.get("is_bot") or not sender.get("id") or chat.get("id") != sender["id"]:
@@ -305,6 +317,10 @@ class Registration:
                 break
         if command in PROFILE_LABELS:
             command = PROFILE
+        if command in REQUESTS_LABELS:
+            command = REQUESTS
+        if command in MEMBERS_LABELS:
+            command = MEMBERS
         if command == '/approve' and ' · ' in text:
             prefix, label = text.split(' · ', 1)
             from .role_content import TEXTS
@@ -400,7 +416,9 @@ class Registration:
         employee = state["candidates"][int(text) - 1]
         self.store.request_registration(user_id, chat_id, employee)
         self.store.set_registration_session(user_id, None)
-        return self.profile(user_id) + tr("\nПосле подтверждения ваши запросы будут связаны с этой учётной записью."), self.keyboard(user_id)
+        self.notices.submitted(user_id)
+        from .role_content import TEXTS
+        return self.profile(user_id) + tr(TEXTS['registration_pending_hint']['ru']), self.keyboard(user_id)
 
     def admin_route(self, user_id: int, command: str, text: str):
         keyboard = self.keyboard(user_id)
@@ -467,10 +485,13 @@ class Registration:
                 return tr("Этот сотрудник больше не активен в Б24. Доступ не выдан."), keyboard
             if not self.store.approve_registration(target_id, user_id, employee, work_role=role):
                 return tr("Учётная запись Б24 уже привязана к другому Telegram ID. Сначала проверьте существующую привязку."), keyboard
+            self.notices.decision(target_id, 'approved')
             self.refresh_commands(target_id)
             if role:
                 return tr(TEXTS['approved']['ru']).format(role=tr(TEXTS['sales' if role=='fom_sales' else role]['ru'])), keyboard
             return tr('Подключён ') + html.escape(employee['name']) + '. /start · ' + tr(PROFILE), keyboard
         status = "rejected" if command == "/reject" else "revoked"
         changed = self.store.deny_registration(target_id, user_id, status)
+        if changed:
+            self.notices.decision(target_id, status)
         return (tr("Заявка отклонена.") if status == "rejected" else tr("Доступ отключён.")) if changed else tr("Регистрация уже обработана; проверьте текущий список."), keyboard

@@ -53,8 +53,8 @@ class OkbAccess:
         if any(self.registration.store.operation(row['request_id'])['value'].get('workflow') == 'okb'
                for row in self.registration.store.unfinished(user_id)):
             commands.update({'/pending', CHECK, CONTINUE})
-        from .registration import PROFILE_LABELS
-        admin_commands = {"/register", "/profile", "/registrations", "/members", "/approve", "/reject", "/revoke", *PROFILE_LABELS, "Заявки менеджеров", "Подключённые менеджеры"}
+        from .registration import PROFILE_LABELS, REQUESTS_LABELS, MEMBERS_LABELS
+        admin_commands = {"/register", "/profile", "/registrations", "/members", "/approve", "/reject", "/revoke", *PROFILE_LABELS, *REQUESTS_LABELS, *MEMBERS_LABELS}
         if command in admin_commands:
             return False
         if command not in commands and not state and web_pharmacy is None:
