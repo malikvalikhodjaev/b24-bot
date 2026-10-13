@@ -424,7 +424,7 @@ class Registration:
         keyboard = self.keyboard(user_id)
         if command in {"/registrations", REQUESTS, "/members", MEMBERS}:
             pending = command in {"/registrations", REQUESTS}
-            rows = self.store.registrations("pending" if pending else "approved")
+            rows = (self.store.registrations('pending') + self.store.registrations('rejected')) if pending else self.store.registrations('approved')
             if not rows:
                 return tr("Новых заявок нет.") if pending else tr("Подключённых менеджеров нет."), keyboard
             lines = [tr("Заявки на подключение:") if pending else tr("Подключённые сотрудники:")]
@@ -439,7 +439,11 @@ class Registration:
                 telegram_name = " ".join(str(identity.get(key) or "") for key in ("first_name", "last_name")).strip()
                 entry = ''.join(['\n', format(html.escape(row['name'][:120]), ''), tr(' · Б24 #'), format(row['bitrix_id'], ''), '\nTelegram: ', format(html.escape(telegram_name[:128]), ''), ' · <code>', format(row['telegram_id'], ''), '</code>'])
                 if pending:
-                    entry += ''.join([tr('\nПодтвердить: /approve '), format(row['telegram_id'], ''), tr('\nОтклонить: /reject '), format(row['telegram_id'], '')])
+                    from .role_content import TEXTS
+                    entry += '\n' + tr(TEXTS['registration_status_'+row['status']]['ru'])
+                    entry += tr('\nПодтвердить: /approve ') + str(row['telegram_id'])
+                    if row['status']=='pending':
+                        entry += tr('\nОтклонить: /reject ') + str(row['telegram_id'])
                 elif row['telegram_id'] not in self.settings.admins:
                     entry += ''.join([tr('\nОтключить: /revoke '), format(row['telegram_id'], '')])
                 if sum(len(line) for line in lines) + len(entry) > 3400:
@@ -447,7 +451,8 @@ class Registration:
                 lines.append(entry)
                 shown += 1
                 if pending:
-                    actions.append([''.join([tr('Подтвердить '), format(row['telegram_id'], '')]), ''.join([tr('Отклонить '), format(row['telegram_id'], '')])])
+                    actions.append([tr('Подтвердить ') + str(row['telegram_id'])] +
+                                   ([tr('Отклонить ') + str(row['telegram_id'])] if row['status']=='pending' else []))
                 elif row['telegram_id'] not in self.settings.admins:
                     actions.append([''.join([tr('Отключить '), format(row['telegram_id'], '')])])
             if start + shown < len(rows):
@@ -467,8 +472,9 @@ class Registration:
         if command == "/approve":
             if row["status"] == "approved":
                 return tr("Регистрация уже подтверждена."), keyboard
-            if row["status"] != "pending":
-                return tr("Подтвердить можно только ожидающую заявку."), keyboard
+            if row["status"] not in {'pending','rejected'}:
+                from .role_content import TEXTS
+                return tr(TEXTS['registration_approval_status']['ru']), keyboard
             role = None
             if self.work_inbox:
                 from .role_content import TEXTS
@@ -483,7 +489,7 @@ class Registration:
             employee = self.directory.employee(row["bitrix_id"])
             if not employee:
                 return tr("Этот сотрудник больше не активен в Б24. Доступ не выдан."), keyboard
-            if not self.store.approve_registration(target_id, user_id, employee, work_role=role):
+            if not self.store.approve_registration(target_id, user_id, employee, work_role=role, expected_status=row['status']):
                 return tr("Учётная запись Б24 уже привязана к другому Telegram ID. Сначала проверьте существующую привязку."), keyboard
             self.notices.decision(target_id, 'approved')
             self.refresh_commands(target_id)

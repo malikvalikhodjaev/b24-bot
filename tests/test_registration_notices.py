@@ -125,6 +125,87 @@ class RegistrationNoticeTests(unittest.TestCase):
         self.press('reg:approve:'+str(self.review())+':fom_sales')
         self.assertEqual(self.registration.work_inbox.store.role(2),'fom_sales')
 
+    def test_rejected_card_can_be_accepted_after_selecting_role_without_reapplying(self):
+        self.request()
+        ident=str(self.review())
+        self.press('reg:reject:'+ident)
+        card=self.telegram.calls[-1][1]
+        self.assertIn('Регистрация отклонена',card['text'])
+        self.assertEqual(card['reply_markup']['inline_keyboard'],[[{'text':'✅ Принять','callback_data':'reg:restore:'+ident}]])
+        self.registration.notices.flush(now=100)
+        self.press('reg:restore:'+ident)
+        self.assertEqual(self.store.registration(2)['status'],'rejected')
+        buttons=self.telegram.calls[-1][1]['reply_markup']['inline_keyboard']
+        self.assertTrue(any(b['callback_data']=='reg:restore_approve:'+ident+':fom_sales' for row in buttons for b in row))
+        self.press('reg:restore_approve:'+ident+':fom_sales')
+        self.registration.notices.flush(now=100)
+        self.assertEqual(self.store.registration(2)['status'],'approved')
+        self.assertEqual(self.registration.work_inbox.store.role(2),'fom_sales')
+        self.assertEqual(self.review(),int(ident))
+        self.assertEqual(len(self.notices(2)),2)
+        self.assertIn('подтверждена',self.notices(2)[-1]['text'])
+
+    def test_stale_pending_approval_cannot_restore_rejection_and_repeat_cannot_change_role(self):
+        self.request()
+        ident=str(self.review())
+        self.press('reg:reject:'+ident)
+        self.press('reg:approve:'+ident+':tech')
+        self.assertEqual(self.store.registration(2)['status'],'rejected')
+        self.press('reg:restore_approve:'+ident+':tech')
+        self.press('reg:restore_approve:'+ident+':fom_sales')
+        self.registration.notices.flush(now=100)
+        self.assertEqual(self.registration.work_inbox.store.role(2),'tech')
+        self.assertEqual(len(self.notices(2)),1)
+
+    def test_restore_is_admin_only_and_old_restore_card_cannot_approve_new_application(self):
+        self.request()
+        ident=str(self.review())
+        self.press('reg:reject:'+ident)
+        self.press('reg:restore_approve:'+ident+':fom_sales',user=2)
+        self.assertEqual(self.store.registration(2)['status'],'rejected')
+        self.request()
+        self.press('reg:restore_approve:'+ident+':tech')
+        self.assertEqual(self.store.registration(2)['status'],'pending')
+        self.assertIsNone(self.registration.work_inbox.store.role(2))
+
+    def test_restore_still_checks_active_employee_and_conflicting_binding(self):
+        self.request()
+        ident=str(self.review())
+        self.press('reg:reject:'+ident)
+        employee=self.directory.rows.pop(20)
+        self.press('reg:restore_approve:'+ident+':tech')
+        self.assertEqual(self.store.registration(2)['status'],'rejected')
+        self.directory.rows[20]=employee
+        self.store.request_registration(3,3,employee)
+        self.assertTrue(self.store.approve_registration(3,1,employee,work_role='tech'))
+        self.press('reg:restore_approve:'+ident+':tech')
+        self.assertEqual(self.store.registration(2)['status'],'rejected')
+        self.assertIsNone(self.registration.work_inbox.store.role(2))
+
+    def test_admin_list_and_legacy_approval_include_rejected_but_do_not_restore_revoked(self):
+        self.request()
+        self.press('reg:reject:'+str(self.review()))
+        text,buttons=self.registration.admin_route(1,'/registrations','/registrations')
+        self.assertIn('Регистрация отклонена',text)
+        self.assertIn(['Подтвердить 2'],buttons)
+        self.registration.admin_route(1,'/approve','/approve 2 tech')
+        self.assertEqual(self.registration.work_inbox.store.role(2),'tech')
+        self.registration.admin_route(1,'/revoke','/revoke 2')
+        self.registration.admin_route(1,'/approve','/approve 2 fom_sales')
+        self.assertEqual(self.store.registration(2)['status'],'revoked')
+        self.assertIsNone(self.registration.user(2))
+
+    def test_storage_restore_requires_expected_status_and_preserves_atomic_role_binding(self):
+        self.request()
+        self.press('reg:reject:'+str(self.review()))
+        self.assertFalse(self.store.approve_registration(2,1,self.directory.rows[20],work_role='tech'))
+        self.assertIsNone(self.registration.work_inbox.store.role(2))
+        self.assertTrue(self.store.approve_registration(2,1,self.directory.rows[20],work_role='tech',expected_status='rejected'))
+        self.assertFalse(self.store.approve_registration(2,1,self.directory.rows[20],work_role='fom_sales',expected_status='rejected'))
+        self.assertEqual(self.registration.work_inbox.store.role(2),'tech')
+        with self.assertRaises(ValueError):
+            self.store.approve_registration(2,1,self.directory.rows[20],expected_status='revoked')
+
     def test_failed_delivery_is_persistent_retried_and_not_repeated_after_restart(self):
         self.request()
         ident=self.review()

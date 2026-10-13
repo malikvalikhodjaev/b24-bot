@@ -99,14 +99,16 @@ class Store:
                 WHERE registrations.status IN ('pending','rejected')""",
                 (telegram_id, chat_id, employee["id"], employee["name"]))
 
-    def approve_registration(self, telegram_id: int, administrator_id: int, employee: dict, *, work_role=None) -> bool:
+    def approve_registration(self, telegram_id: int, administrator_id: int, employee: dict, *, work_role=None, expected_status='pending') -> bool:
+        if expected_status not in {'pending','rejected'}:
+            raise ValueError('Invalid approval status')
         if work_role is not None and work_role not in {'fom_sales','tech','trainer','dispatcher'}:
             raise ValueError('Invalid work role')
         try:
             with self.db:
                 changed = self.db.execute("""UPDATE registrations SET status='approved',approved_by=?,
-                    name=?,updated_at=CURRENT_TIMESTAMP WHERE telegram_id=? AND status='pending' AND bitrix_id=?""",
-                    (administrator_id, employee["name"], telegram_id, employee["id"])).rowcount
+                    name=?,updated_at=CURRENT_TIMESTAMP WHERE telegram_id=? AND status=? AND bitrix_id=?""",
+                    (administrator_id, employee["name"], telegram_id, expected_status, employee["id"])).rowcount
                 if changed and work_role is not None:
                     self.db.execute('''INSERT INTO fom_request_members(telegram_id,role,granted_by) VALUES(?,?,?)
                         ON CONFLICT(telegram_id) DO UPDATE SET role=excluded.role,granted_by=excluded.granted_by,

@@ -86,14 +86,19 @@ class RegistrationNotices:
         text += '\nTelegram ID: <code>' + str(target) + '</code>'
         if row['status'] != 'pending':
             text += '\n\n' + phrase('registration_status_'+row['status'])
-            return text, []
+            if row['status'] != 'rejected':
+                return text, []
         ident = str(review['id'])
+        rejected = row['status']=='rejected'
         if choose_role and self.registration.work_inbox:
             text += '\n\n' + phrase('choose_role')
             buttons = [[{'text':phrase('sales' if role=='fom_sales' else role),
-                         'callback_data':'reg:approve:'+ident+':'+role}] for role in ROLES]
-            buttons += [[{'text':phrase('registration_reject'),'callback_data':'reg:reject:'+ident},
-                         {'text':phrase('registration_back'),'callback_data':'reg:card:'+ident}]]
+                         'callback_data':('reg:restore_approve:' if rejected else 'reg:approve:')+ident+':'+role}] for role in ROLES]
+            back = {'text':phrase('registration_back'),'callback_data':'reg:card:'+ident}
+            buttons += [[back] if rejected else [{'text':phrase('registration_reject'),'callback_data':'reg:reject:'+ident},back]]
+        elif rejected:
+            text += '\n\n' + phrase('registration_restore_hint')
+            buttons = [[{'text':phrase('registration_accept'),'callback_data':'reg:restore:'+ident}]]
         else:
             text += '\n\n' + phrase('registration_admin_hint')
             buttons = [[{'text':phrase('registration_accept'),'callback_data':'reg:choose:'+ident},
@@ -163,7 +168,7 @@ class RegistrationNotices:
         allowed = (isinstance(user,int) and not sender.get('is_bot') and chat.get('type')=='private'
                    and chat.get('id')==user and isinstance(message.get('message_id'),int)
                    and message['message_id']>0 and user in self.registration.settings.admins and self.registration.user(user))
-        match = re.fullmatch(r'reg:(card|choose|approve|reject):([1-9]\d{0,17})(?::(fom_sales|tech|trainer|dispatcher))?',data)
+        match = re.fullmatch(r'reg:(card|choose|approve|reject|restore|restore_approve):([1-9]\d{0,17})(?::(fom_sales|tech|trainer|dispatcher))?',data)
         error = 'registration_admin_only' if not allowed else 'registration_invalid'
         review = None
         if allowed and match:
@@ -171,7 +176,8 @@ class RegistrationNotices:
             if review:
                 review = dict(review)
                 row = self.registration.store.registration(review['telegram_id'])
-                if (row and row['status']=='pending' and row['bitrix_id']==review['bitrix_id'] and
+                statuses = {'rejected'} if match[1] in {'restore','restore_approve'} else {'pending','rejected'} if match[1]=='card' else {'pending'}
+                if (row and row['status'] in statuses and row['bitrix_id']==review['bitrix_id'] and
                         self.latest(review['telegram_id'])['id']==review['id'] and review['telegram_id'] not in self.registration.settings.admins):
                     error = None
                 else:
@@ -181,6 +187,7 @@ class RegistrationNotices:
         if error:
             return True
         action, role = match[1],match[3]
+        action = {'restore':'choose','restore_approve':'approve'}.get(action,action)
         if action=='choose' and not self.registration.work_inbox:
             action = 'approve'
         if action in {'card','choose'} and role is None:
@@ -192,10 +199,12 @@ class RegistrationNotices:
             except RemoteError:
                 text, buttons = phrase('registration_crm_unavailable'),self.card(review,choose_role=True)[1]
             else:
-                _, buttons = self.card(review,choose_role=True)
+                card_text, buttons = self.card(review,choose_role=True)
+                if self.registration.store.registration(review['telegram_id'])['status']=='approved':
+                    text = card_text
         elif action=='reject' and role is None:
             text, _ = self.registration.admin_route(user,'/reject','/reject '+str(review['telegram_id']))
-            _, buttons = self.card(review)
+            text, buttons = self.card(review)
         else:
             text, buttons = phrase('registration_invalid'),self.card(review,choose_role=True)[1]
         if not buttons:
