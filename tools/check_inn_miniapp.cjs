@@ -24,11 +24,21 @@ const companies=[{id:7,title:'ООО «Саломат Фарм»',pharmacy_count
     });
     await page.goto(base+`?mode=${mode}&lang=ru&token=datfo-form-${'a'.repeat(32)}`);
     await page.waitForFunction(()=>document.querySelector('[name=business_region]').options.length>1);
+    if(mode==='deal')await page.locator('[name=entry_kind][value=inn]').check();
     return {page,context,errors};
   }
   async function find(p,inn='300000101'){await p.locator('[name=inn]').fill(inn);await p.locator('#findInn').click();assert.match(await p.locator('#lookupStatus').innerText(),/Подождите/);await p.waitForFunction(()=>!document.getElementById('findInn').disabled);}
   async function program(p){await p.locator('[name=discussion_programs]').first().check();}
   async function send(p){await p.locator('[type=submit]').click();await p.waitForFunction(()=>window.sent.length===1);return p.evaluate(()=>window.sent[0]);}
+  {
+    const {page:p,context,errors}=await page('deal',320);await p.locator('[name=entry_kind][value=title]').check();
+    await p.locator('[name=deal_title]').fill('Обсудить внедрение F-Apteka');await program(p);
+    assert.equal(await p.locator('#companyFields').isVisible(),false);
+    assert.equal(await p.locator('[name=inn]').isDisabled(),true);
+    const value=await send(p);assert.equal(value.pharmacy_kind,'title');assert.equal(value.deal_title,'Обсудить внедрение F-Apteka');assert.equal(value.inn,'');
+    assert.deepEqual(errors,[]);assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await p.screenshot({path:path.join(output,'title-only-320.png'),fullPage:true});results.push('title-only-without-inn');await context.close();
+  }
   for(const width of [320,390,1280]){
     const {page:p,context,errors}=await page('deal',width);await find(p);assert.match(await p.locator('#lookupStatus').innerText(),/Аптек в базе: 2/);
     await p.locator('[name=pharmacy_kind][value=company]').check();await program(p);

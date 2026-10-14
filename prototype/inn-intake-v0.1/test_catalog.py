@@ -14,6 +14,21 @@ class FlowTests(unittest.TestCase):
     def setUp(self):
         self.catalogue=PreviewCatalogue()
 
+    def test_title_only_does_not_need_inn_or_query_any_catalogue(self):
+        result=self.catalogue.preview({'mode':'deal','target':'title','deal_title':'Обсудить программу',
+            'discussion_programs':[REFERENCE['discussion_programs'][0]['id']]})
+        self.assertEqual(result['title'],'Обсудить программу')
+        self.assertIsNone(result['company'])
+        self.assertIsNone(result['pharmacy'])
+        self.assertEqual(result['inn'],'')
+        self.assertFalse(result['crm_writes'])
+
+    def test_title_only_rejects_invalid_name_and_support_mode(self):
+        for mode,name in (('support','Помощь'),('deal',''),('deal','x'),('deal','/cancel'),('deal','x'*121)):
+            with self.assertRaises(ValueError):
+                self.catalogue.preview({'mode':mode,'target':'title','deal_title':name,
+                    'discussion_programs':[REFERENCE['discussion_programs'][0]['id']]})
+
     def test_exact_inn_and_number_of_pharmacies(self):
         self.assertEqual(self.catalogue.lookup('demo','300000101')[0]['pharmacy_count'],3)
         self.assertEqual(self.catalogue.lookup('demo','300000102')[0]['pharmacy_count'],0)

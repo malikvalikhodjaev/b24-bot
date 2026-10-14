@@ -125,46 +125,54 @@ class PreviewCatalogue:
         """Validate the proposed binding without creating any CRM entities."""
         if not isinstance(data,dict) or data.get('mode') not in {'deal','support'}:
             raise ValueError('Выберите сделку или заявку.')
-        inn = inn_value(data.get('inn'))
-        companies = self.lookup(data.get('source'),inn)
-        target = data.get('target')
-        if target not in {'company','pharmacy','new_pharmacy'}:
-            raise ValueError('Выберите фирму или аптеку.')
-        if companies:
-            company = next((row for row in companies if str(row['id']) == str(data.get('company_id'))),None)
-            if not company:
-                raise ValueError('Фирма не найдена среди результатов этого ИНН. Повторите поиск.')
-            create_company = False
+        title_only = data.get('target') == 'title'
+        if title_only:
+            name = data.get('deal_title')
+            if data['mode'] != 'deal' or not isinstance(name,str) or not 2 <= len(name.strip()) <= 120 or name.strip().startswith('/'):
+                raise ValueError('Укажите название сделки (2–120 символов).')
+            company = pharmacy = None
+            result = {'mode':'deal','target':'title','inn':'','company':None,'pharmacy':None,'crm_writes':False}
         else:
-            name = data.get('company_name')
-            if data.get('create_company') is not True or not isinstance(name,str) or not 2 <= len(name.strip()) <= 120:
-                raise ValueError('Подтвердите создание фирмы и заполните её наименование.')
-            company = {'id':None,'title':name.strip(),'inn':inn,'pharmacies':[]}
-            create_company = True
-        pharmacy = None
-        if target == 'pharmacy':
-            pharmacy = next((row for row in company['pharmacies'] if str(row['id']) == str(data.get('pharmacy_id'))),None)
-            if not pharmacy:
-                raise ValueError('Эта аптека не относится к выбранной фирме. Выберите аптеку из списка.')
-            if data['mode']=='deal' and pharmacy['inactive'] and data.get('confirm_inactive') is not True:
-                raise ValueError('Подтвердите открытие сделки на закрытую или неработающую аптеку.')
-        elif target == 'new_pharmacy':
-            value = data.get('new_pharmacy')
-            if not isinstance(value,dict):
-                raise ValueError('Заполните данные новой аптеки.')
-            for key,label in (('title','Название аптеки'),('address','Адрес')):
-                if not isinstance(value.get(key),str) or not 2 <= len(value[key].strip()) <= 500:
-                    raise ValueError('Заполните поле: '+label)
-            region = next((row for row in REFERENCE['regions'] if str(row['id'])==str(value.get('region'))),None)
-            city = next((row for row in REFERENCE['cities'].get(str(value.get('region')),[]) if str(row['id'])==str(value.get('city'))),None)
-            program = next((row for row in REFERENCE['programs'] if str(row['id'])==str(value.get('program'))),None)
-            if not region or not city or not program:
-                raise ValueError('Выберите регион, город/район и текущую программу новой аптеки.')
-            pharmacy = {'id':None,'fom_id':'','title':value['title'].strip(),'address':value['address'].strip(),
-                'region':region['title'],'city':city['title'],'program':program['title'],'status':'Потенциальная'}
-        result = {'mode':data['mode'],'target':target,'inn':inn,
-            'company':{'id':company['id'],'title':company['title'],'create':create_company},
-            'pharmacy':pharmacy,'crm_writes':False}
+            inn = inn_value(data.get('inn'))
+            companies = self.lookup(data.get('source'),inn)
+            target = data.get('target')
+            if target not in {'company','pharmacy','new_pharmacy'}:
+                raise ValueError('Выберите фирму или аптеку.')
+            if companies:
+                company = next((row for row in companies if str(row['id']) == str(data.get('company_id'))),None)
+                if not company:
+                    raise ValueError('Фирма не найдена среди результатов этого ИНН. Повторите поиск.')
+                create_company = False
+            else:
+                name = data.get('company_name')
+                if data.get('create_company') is not True or not isinstance(name,str) or not 2 <= len(name.strip()) <= 120:
+                    raise ValueError('Подтвердите создание фирмы и заполните её наименование.')
+                company = {'id':None,'title':name.strip(),'inn':inn,'pharmacies':[]}
+                create_company = True
+            pharmacy = None
+            if target == 'pharmacy':
+                pharmacy = next((row for row in company['pharmacies'] if str(row['id']) == str(data.get('pharmacy_id'))),None)
+                if not pharmacy:
+                    raise ValueError('Эта аптека не относится к выбранной фирме. Выберите аптеку из списка.')
+                if data['mode']=='deal' and pharmacy['inactive'] and data.get('confirm_inactive') is not True:
+                    raise ValueError('Подтвердите открытие сделки на закрытую или неработающую аптеку.')
+            elif target == 'new_pharmacy':
+                value = data.get('new_pharmacy')
+                if not isinstance(value,dict):
+                    raise ValueError('Заполните данные новой аптеки.')
+                for key,label in (('title','Название аптеки'),('address','Адрес')):
+                    if not isinstance(value.get(key),str) or not 2 <= len(value[key].strip()) <= 500:
+                        raise ValueError('Заполните поле: '+label)
+                region = next((row for row in REFERENCE['regions'] if str(row['id'])==str(value.get('region'))),None)
+                city = next((row for row in REFERENCE['cities'].get(str(value.get('region')),[]) if str(row['id'])==str(value.get('city'))),None)
+                program = next((row for row in REFERENCE['programs'] if str(row['id'])==str(value.get('program'))),None)
+                if not region or not city or not program:
+                    raise ValueError('Выберите регион, город/район и текущую программу новой аптеки.')
+                pharmacy = {'id':None,'fom_id':'','title':value['title'].strip(),'address':value['address'].strip(),
+                    'region':region['title'],'city':city['title'],'program':program['title'],'status':'Потенциальная'}
+            result = {'mode':data['mode'],'target':target,'inn':inn,
+                'company':{'id':company['id'],'title':company['title'],'create':create_company},
+                'pharmacy':pharmacy,'crm_writes':False}
         if data['mode']=='deal':
             chosen = data.get('discussion_programs',[])
             if not isinstance(chosen,list) or any(not isinstance(item,str) for item in chosen):
@@ -172,7 +180,7 @@ class PreviewCatalogue:
             programs = [row for row in REFERENCE['discussion_programs'] if row['id'] in chosen]
             if not isinstance(chosen,list) or not chosen or len(programs)!=len(set(chosen)):
                 raise ValueError('Выберите программы для обсуждения с клиентом.')
-            result.update(title='План: '+(pharmacy or company)['title'],programs=[row['title'] for row in programs],
+            result.update(title=data['deal_title'].strip() if title_only else 'План: '+(pharmacy or company)['title'],programs=[row['title'] for row in programs],
                           pipeline='Продажи и онбординг [KG]',stage='План')
             if data.get('reminder'):
                 reminder = data['reminder']

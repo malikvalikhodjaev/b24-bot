@@ -10,7 +10,7 @@ const url='http://127.0.0.1:18771/';
  const browser=await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:390,height:844}});
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
- async function open(){await page.goto(url);await page.locator('[name=discussion_program]').first().waitFor({state:'attached'});}
+ async function open(){await page.goto(url);await page.locator('#entryInn').click();await page.locator('[name=discussion_program]').first().waitFor({state:'attached'});}
  async function example(inn){await open();await page.locator('.examples summary').click();await page.locator('[data-example="'+inn+'"]').click();await page.locator('#scopeSection:not([hidden]),#unknownCompany:not([hidden]),#companyPicker:not([hidden])').waitFor();}
  async function salesPreview(){await page.locator('[name=discussion_program]').first().check();await page.locator('#reviewButton').click();await page.locator('#reviewSection:not([hidden])').waitFor();return page.evaluate(()=>state.result);}
  async function noOverflow(){assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);}

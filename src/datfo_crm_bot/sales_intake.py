@@ -314,7 +314,7 @@ class SalesIntake:
         return tr('Телефон для связи или «Без телефона». Можно без +998.'), [[SKIP_PHONE], [CANCEL]], state
 
     def route_payload(self, user_id, data, state):
-        if data.get('mode')=='deal' and data.get('pharmacy_kind') not in {'new','existing','company'}:
+        if data.get('mode')=='deal' and data.get('pharmacy_kind') not in {'new','existing','company','title'}:
             raise ValueError(tr('Выберите новую или существующую аптеку.'))
         if data.get('pharmacy_kind') == 'company' and data.get('intake_version') != 2:
             raise ValueError(tr('Откройте новую форму через меню бота.'))
@@ -323,6 +323,17 @@ class SalesIntake:
         planned = reminder(data, self.bot.config.timezone, self.bot.clock())
         if 'discussion_programs' in data:
             state['discussion_programs'] = selected_programs(data['discussion_programs'], discussion_choices(self.crm.api))
+        if data.get('pharmacy_kind') == 'title':
+            if data.get('mode') != 'deal' or data.get('intake_version') != 2:
+                raise ValueError(tr('Откройте новую форму через меню бота.'))
+            title = data.get('deal_title')
+            if not isinstance(title,str) or not 2 <= len(title.strip()) <= 120 or title.strip().startswith('/'):
+                raise ValueError(tr('Укажите название сделки (2–120 символов).'))
+            for key in ('pharmacy','pharmacy_form','company_name','new_company','company_consent','pharmacy_id'):
+                state.pop(key,None)
+            state.update(title_only=True,company_only=False,new_pharmacy=False,inn_intake=False,
+                         company=None,inn='',title=title.strip(),address='',phone='',**planned)
+            return self.finish_form(user_id,state)
         if data.get('intake_version') == 2:
             from .inn_target import selection
             chosen = selection(self, data)
@@ -351,7 +362,7 @@ class SalesIntake:
     def finish_form(self, user_id, state):
         if not state.get('discussion_programs'):
             return self.programs_prompt(state)
-        if not state.get('new_pharmacy') and not state.get('company_only') and not self.status_confirmed(user_id, state):
+        if not state.get('new_pharmacy') and not state.get('company_only') and not state.get('title_only') and not self.status_confirmed(user_id, state):
             return self.status_prompt(state)
         if state.get('live_test'):
             state['title'] = '[ТЕСТ БОТА] ' + state['title']
@@ -363,7 +374,7 @@ class SalesIntake:
         text = '<b>'+intake('preview')+'</b>\n\n'+sale_blocks(state, self.bot.config.users[user_id].name)
         if state.get('new_pharmacy'):
             text += '\n'+tr('После подтверждения добавим аптеку в ОКБ и свяжем с ней сделку.')
-        elif not state.get('company_only'):
+        elif not state.get('company_only') and not state.get('title_only'):
             text += '\n'+tr('Используем существующую аптеку; её справочные поля не меняем.')
         text += '\n\n'+intake('confirm_hint')
         return text, [[CONFIRM, CANCEL]], state
@@ -450,7 +461,9 @@ class SalesIntake:
             category, stage = self.crm.sales_destination()
             if (category['id'], stage['id']) != (state['category_id'], state['initial_stage']):
                 raise ConfigError(tr('Воронка или стадия продаж изменилась. Проверьте форму заново.'))
-            if state.get('company_only'):
+            if state.get('title_only'):
+                company = pharmacy = None
+            elif state.get('company_only'):
                 from .inn_target import save_company
                 company = save_company(self,user_id,state,verify_only=verify_only)
                 pharmacy = None

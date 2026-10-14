@@ -39,7 +39,9 @@ def pharmacy_blocks(state, manager):
 
 
 def sale_blocks(state, manager):
-    if state.get('company_only'):
+    if state.get('title_only'):
+        text = ''
+    elif state.get('company_only'):
         text = '\n'.join([phrase('company_section'), '<b>'+esc(state['company_name'])+'</b>',
             tr('ИНН: ')+esc(state['inn']), phrase('new_company') if state.get('new_company') else '',
             tr('Сделка на фирму целиком.')])
@@ -54,7 +56,7 @@ def sale_blocks(state, manager):
             tr('Телефон: ') + esc(state.get('phone') or phrase('not_set'))])
         if row.get('status'):
             text = text.replace('\nFOM ID:', '\n' + tr('Статус аптеки: ') + esc(row['status']['title']) + '\nFOM ID:', 1)
-    text += '\n\n' + phrase('deal_section') + '\n<b>' + esc(state['title']) + '</b>'
+    text += ('\n\n' if text else '') + phrase('deal_section') + '\n<b>' + esc(state['title']) + '</b>'
     text += '\n' + tr('Воронка: ') + esc(state['category_name']) + '\n' + tr('Стадия: ') + esc(state['initial_stage_name'])
     text += '\n' + tr('Ответственный: ') + esc(manager)
     if state.get('discussion_programs'):

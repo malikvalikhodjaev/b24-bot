@@ -44,6 +44,69 @@ class DealTests(unittest.TestCase):
         self.assertEqual(self.api.pharmacies,before)
         self.assertEqual(self.store.operation(state['request_id'])['status'],'succeeded')
 
+    def title_value(self, **changes):
+        return {'token':self.token(),'mode':'deal','intake_version':2,'pharmacy_kind':'title',
+                'deal_title':'Обсудить внедрение F-Apteka','reminder':False,**changes}
+
+    def test_title_only_has_exact_title_and_no_company_pharmacy_or_inn_lookup(self):
+        self.api.calls.clear()
+        self.send_form(self.title_value())
+        state = self.store.session(100)
+        self.assertEqual(state['step'],'confirm')
+        self.assertEqual(state['title'],'Обсудить внедрение F-Apteka')
+        self.assertEqual(state['inn'],'')
+        self.assertNotIn('pharmacy',state)
+        self.assertEqual(self.api.rows,{})
+        preview = self.telegram.messages[-1][1]
+        self.assertNotIn('FOM ID',preview)
+        self.assertNotIn('Компания / Фирма',preview)
+        self.say(CONFIRM)
+        self.say(CONFIRM)
+        self.assertEqual(len(self.api.rows),1)
+        remote = self.api.rows[501]
+        self.assertEqual(remote['title'],state['title'])
+        self.assertEqual(remote['assignedById'],132)
+        self.assertEqual(remote['stageId'],'C45:PLAN')
+        self.assertNotIn('companyId',remote)
+        self.assertNotIn('parentId1034',remote)
+        self.assertFalse(any(method.startswith(('crm.company.','crm.requisite.','crm.contact.'))
+                             or (method=='crm.item.get' and data['entityTypeId']==1034)
+                             for method,data in self.api.calls))
+
+    def test_title_only_ignores_stale_fields_from_inn_branch(self):
+        self.send_form(self.title_value(inn='123456789',company_id=7,pharmacy_id=81,
+            company_name='Old company',create_company=True,phone='+998909876543'))
+        state = self.store.session(100)
+        self.assertFalse(state['inn_intake'])
+        self.assertIsNone(state['company'])
+        self.assertEqual(state['phone'],'')
+        self.say(CONFIRM)
+        self.assertNotIn('companyId',self.api.rows[501])
+        self.assertNotIn('parentId1034',self.api.rows[501])
+
+    def test_title_only_recovers_lost_deal_response_without_duplicate(self):
+        self.api.lost_create = True
+        self.send_form(self.title_value())
+        self.say(CONFIRM)
+        self.say(CONFIRM)
+        self.assertEqual(len(self.api.rows),1)
+        self.assertEqual(sum(method=='crm.item.add' for method,_ in self.api.calls),1)
+
+    def test_title_only_can_add_reminder_to_same_deal(self):
+        self.send_form(self.title_value(reminder=True,reminder_action='call',deadline='2099-10-14T10:30'))
+        self.say(CONFIRM)
+        self.assertEqual(len(self.api.activities),1)
+        self.assertEqual(self.api.activities[901]['ownerId'],501)
+        self.assertEqual(self.api.activities[901]['responsibleId'],132)
+
+    def test_title_only_validates_name_before_prepare_or_write(self):
+        self.send_form(self.title_value(deal_title=''))
+        state = self.store.session(100)
+        for bad in ('',' ','x','/cancel','x'*121,None):
+            with self.subTest(title=bad),self.assertRaises(ValueError):
+                self.live.bot.sales.route_payload(100,self.title_value(deal_title=bad),deepcopy(state))
+        self.assertEqual(self.api.rows,{})
+
     def test_selected_pharmacy_without_fom_id_is_linked_by_internal_id(self):
         self.api.pharmacies[81].pop('UF_CRM_8_1719398102513')
         self.send_form(self.value(pharmacy_kind='existing',pharmacy_id=81))
