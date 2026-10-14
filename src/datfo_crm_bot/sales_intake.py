@@ -361,11 +361,9 @@ class SalesIntake:
 
     def preview(self, user_id, state):
         text = '<b>'+intake('preview')+'</b>\n\n'+sale_blocks(state, self.bot.config.users[user_id].name)
-        if state.get('company_only'):
-            text += '\n'+tr('Создадим сделку на фирму по ИНН, без привязки к аптечной точке.')
-        elif state.get('new_pharmacy'):
+        if state.get('new_pharmacy'):
             text += '\n'+tr('После подтверждения добавим аптеку в ОКБ и свяжем с ней сделку.')
-        else:
+        elif not state.get('company_only'):
             text += '\n'+tr('Используем существующую аптеку; её справочные поля не меняем.')
         text += '\n\n'+intake('confirm_hint')
         return text, [[CONFIRM, CANCEL]], state

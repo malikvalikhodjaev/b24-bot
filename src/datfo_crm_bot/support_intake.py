@@ -120,7 +120,7 @@ class SupportIntake:
         contact = contact_preview(draft.get('contact_details'))
         if draft.get('company_only'):
             return (intake('company_section')+'\n<b>'+escape(draft['company_name'])+'</b>\n'
-                +tr('ИНН: ')+escape(draft['inn'])+'\n'+tr('Без привязки к аптечной точке.')
+                +tr('ИНН: ')+escape(draft['inn'])+'\n'+tr('Заявка на фирму целиком.')
                 + ('\n'+intake('new_company') if draft.get('new_company') else '')
                 + ('\n\n'+contact if contact else ''))
         if draft.get('pharmacy_form'):

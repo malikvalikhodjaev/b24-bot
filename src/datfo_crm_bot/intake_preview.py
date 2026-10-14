@@ -42,7 +42,7 @@ def sale_blocks(state, manager):
     if state.get('company_only'):
         text = '\n'.join([phrase('company_section'), '<b>'+esc(state['company_name'])+'</b>',
             tr('ИНН: ')+esc(state['inn']), phrase('new_company') if state.get('new_company') else '',
-            tr('Без привязки к аптечной точке.')])
+            tr('Сделка на фирму целиком.')])
     elif state.get('new_pharmacy'):
         text = pharmacy_blocks(state['pharmacy_form'], manager)
     else:
