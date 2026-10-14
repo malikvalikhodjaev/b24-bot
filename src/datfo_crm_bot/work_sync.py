@@ -121,6 +121,8 @@ class WorkSync:
             raise RemoteError('FOM_CRM_SOURCE_CHANGED')
         if int(remote.get('categoryId',-1)) != self.settings.category_id:
             raise RemoteError('FOM_CRM_CATEGORY_CHANGED')
+        if row.get('link_kind') == 'company' and (str(remote.get('companyId')) != str(row['company_id']) or remote.get('parentId1034') not in (None,'',0,'0')):
+            raise RemoteError('FOM_CRM_SOURCE_CHANGED')
 
     def find(self, row):
         records = self.crm.api.list_all('crm.deal.list',{'filter':{'ORIGINATOR_ID':SOURCE,
@@ -249,7 +251,16 @@ class WorkSync:
                 except ValueError as exc:
                     raise RemoteError('SUPPORT_TYPE_CHANGED') from exc
                 fields.update(native_fields(row.get('support_details'), row['description']))
-                if row.get('link_kind')=='pharmacy':
+                if row.get('link_kind')=='company':
+                    companies = self.crm.companies(row['company_inn'])
+                    if not any(company['id']==row['company_id'] for company in companies):
+                        raise RemoteError('FOM_COMPANY_CHANGED')
+                    company = self.crm.api.call('crm.company.get',{'id':row['company_id']})['result']
+                    if not isinstance(company,dict) or str(company.get('ID')) != str(row['company_id']):
+                        raise RemoteError('FOM_COMPANY_CHANGED')
+                    source = {'companyId':row['company_id']}
+                    source_label = f"Компания (ИНН {row['company_inn']}): {row['deal_url']}"
+                elif row.get('link_kind')=='pharmacy':
                     source = self.crm.api.call('crm.item.get',{'entityTypeId':1034,'id':row['pharmacy_id'],'useOriginalUfNames':'Y'})['result'].get('item')
                     if not isinstance(source,dict) or str(source.get('id'))!=str(row['pharmacy_id']) or str(source.get('categoryId'))!='17' or int(source.get('companyId') or 0)!=row['pharmacy_company_id']:
                         raise RemoteError('FOM_PHARMACY_CHANGED')

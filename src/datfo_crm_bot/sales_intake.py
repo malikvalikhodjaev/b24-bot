@@ -314,18 +314,29 @@ class SalesIntake:
         return tr('Телефон для связи или «Без телефона». Можно без +998.'), [[SKIP_PHONE], [CANCEL]], state
 
     def route_payload(self, user_id, data, state):
-        if data.get('mode')=='deal' and data.get('pharmacy_kind') not in {'new','existing'}:
+        if data.get('mode')=='deal' and data.get('pharmacy_kind') not in {'new','existing','company'}:
             raise ValueError(tr('Выберите новую или существующую аптеку.'))
+        if data.get('pharmacy_kind') == 'company' and data.get('intake_version') != 2:
+            raise ValueError(tr('Откройте новую форму через меню бота.'))
         if state['step'] not in {'sales_pharmacy', 'sales_bulk_input'}:
             raise ValueError(tr('На этом шаге форма недоступна.'))
         planned = reminder(data, self.bot.config.timezone, self.bot.clock())
         if 'discussion_programs' in data:
             state['discussion_programs'] = selected_programs(data['discussion_programs'], discussion_choices(self.crm.api))
+        if data.get('intake_version') == 2:
+            from .inn_target import selection
+            chosen = selection(self, data)
+            state.update(chosen)
+            if data.get('pharmacy_kind') == 'company':
+                state.update(company_only=True,new_pharmacy=False,title='План: '+chosen['company_name'],
+                             address='',phone='',**planned)
+                return self.finish_form(user_id,state)
         if data.get('pharmacy_kind') == 'existing':
-            pharmacy=self.lookup_fom(data.get('fom_id'))
+            pharmacy=state['pharmacy'] if data.get('intake_version') == 2 else self.lookup_fom(data.get('fom_id'))
             state.update(new_pharmacy=False,pharmacy=pharmacy,
                 company=self.company(pharmacy['company_id']) if pharmacy['company_id'] else None,
-                inn='',title='План: '+pharmacy['title'],address=pharmacy['address'],phone=pharmacy['phone'],**planned)
+                inn=state.get('inn','') if data.get('intake_version') == 2 else '',
+                title='План: '+pharmacy['title'],address=pharmacy['address'],phone=pharmacy['phone'],**planned)
             return self.finish_form(user_id,state)
         child = {'kind': 'pharmacy', 'workflow': 'okb', 'sales_parent': state['request_id'],
                  'request_id': state['request_id']+'-pharmacy', 'step': 'okb_inn'}
@@ -340,7 +351,7 @@ class SalesIntake:
     def finish_form(self, user_id, state):
         if not state.get('discussion_programs'):
             return self.programs_prompt(state)
-        if not state.get('new_pharmacy') and not self.status_confirmed(user_id, state):
+        if not state.get('new_pharmacy') and not state.get('company_only') and not self.status_confirmed(user_id, state):
             return self.status_prompt(state)
         if state.get('live_test'):
             state['title'] = '[ТЕСТ БОТА] ' + state['title']
@@ -350,7 +361,9 @@ class SalesIntake:
 
     def preview(self, user_id, state):
         text = '<b>'+intake('preview')+'</b>\n\n'+sale_blocks(state, self.bot.config.users[user_id].name)
-        if state.get('new_pharmacy'):
+        if state.get('company_only'):
+            text += '\n'+tr('Создадим сделку на фирму по ИНН, без привязки к аптечной точке.')
+        elif state.get('new_pharmacy'):
             text += '\n'+tr('После подтверждения добавим аптеку в ОКБ и свяжем с ней сделку.')
         else:
             text += '\n'+tr('Используем существующую аптеку; её справочные поля не меняем.')
@@ -439,7 +452,11 @@ class SalesIntake:
             category, stage = self.crm.sales_destination()
             if (category['id'], stage['id']) != (state['category_id'], state['initial_stage']):
                 raise ConfigError(tr('Воронка или стадия продаж изменилась. Проверьте форму заново.'))
-            if state.get('new_pharmacy'):
+            if state.get('company_only'):
+                from .inn_target import save_company
+                company = save_company(self,user_id,state,verify_only=verify_only)
+                pharmacy = None
+            elif state.get('new_pharmacy'):
                 child = state['pharmacy_form']
                 self.store.prepare(user_id, child, utc_text(self.bot.clock()))
                 self.store.status(state['request_id'], 'created')
@@ -470,12 +487,16 @@ class SalesIntake:
                 if int(current.get('companyId') or 0) != pharmacy['company_id']:
                     raise ConfigError(tr('Компания выбранной аптеки изменилась. Проверьте привязку перед сохранением.'))
                 company = state.get('company')
-            actual = {**state, 'company': company, 'pharmacy_id': pharmacy['id']}
+                if state.get('inn_intake'):
+                    from .inn_target import check_company
+                    company = check_company(self,state)
+            actual = {**state, 'company': company, 'pharmacy_id': pharmacy['id'] if pharmacy else None}
             deal = self.okb.phase(state, 'sales_deal', lambda: self.crm.find_request('deal', state['request_id']),
                 lambda: self.create_deal(actual, manager, user_id), verify_only=verify_only)
             self.store.status(state['request_id'], 'created', deal)
             current_deal = self.crm.item(deal['id'])
-            if (str(current_deal.get('parentId1034')) != str(pharmacy['id'])
+            if ((str(current_deal.get('parentId1034')) != str(pharmacy['id']) if pharmacy else current_deal.get('parentId1034') not in (None,'',0,'0'))
+                    or (state.get('inn_intake') and str(current_deal.get('companyId')) != str(company['id']))
                     or current_deal.get('originId') != state['request_id']
                     or current_deal.get('originatorId') != self.bot.config.targets['deal'].defaults['originatorId']):
                 raise ConfigError(tr('Связь созданной сделки с аптекой не подтверждена. Проверьте карточку Б24 перед следующим шагом.'))
@@ -485,7 +506,8 @@ class SalesIntake:
                 activity = self.okb.phase(state, 'sales_next_step', lambda: self.find_activity(state, deal),
                     lambda: self.add_activity(state, deal, manager), verify_only=verify_only)
                 self.activity_metadata(state, deal, activity, verify_only=verify_only)
-            result = {**deal, 'activity_id': activity['id'] if activity else None, 'pharmacy_id': pharmacy['id']}
+            result = {**deal, 'activity_id': activity['id'] if activity else None,
+                      'pharmacy_id': pharmacy['id'] if pharmacy else None,'company_id':company['id'] if company else None}
             self.store.status(state['request_id'], 'succeeded', result, utc_text(self.bot.clock()))
             return self.success(state, result)
         except PendingStep as exc:

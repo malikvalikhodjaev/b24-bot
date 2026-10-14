@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 from uuid import uuid4
+import time
 
 from .config import ROOT
 from .i18n import tr, stored_language
@@ -67,8 +68,8 @@ def launch_button(store, user, mode, label):
     key = 'webapp-launch:'+mode+':'+str(user)
     row = store.db.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
     record = json.loads(row['value']) if row else {}
-    if not record or record.get('used'):
-        record = {'token':'datfo-form-'+uuid4().hex, 'used':False}
+    if not record or record.get('used') or (record.get('issued_at') and time.time()-record['issued_at'] > 86400):
+        record = {'token':'datfo-form-'+uuid4().hex, 'used':False,'issued_at':time.time()}
         with store.db:
             store.db.execute('INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
                              (key,json.dumps(record)))

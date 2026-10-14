@@ -233,6 +233,19 @@ class OkbBot(Bot):
         if len(companies) > 20:
             raise ValueError(tr('По ИНН найдено больше 20 компаний. Нужна проверка дублей.'))
         state.update(values, company=None, new_company=not companies)
+        if data.get('intake_version') == 2:
+            from .inn_lookup import inn_value
+            from .config import positive_id
+            inn_value(data.get('inn'))
+            ident = data.get('company_id')
+            if ident not in (None,'',0):
+                company = next((row for row in companies if row['id'] == positive_id(ident,'Компания')),None)
+                if company is None:
+                    raise ConfigError(tr('Фирма не относится к этому ИНН. Повторите поиск.'))
+                state.update(company=company,company_name=company['title'],new_company=False)
+            elif companies or data.get('create_company') is not True or not values['company_name']:
+                raise ConfigError(tr('Выберите фирму или подтвердите создание новой.'))
+            return self.bulk_contact(user_id,state)
         if not companies and not values['company_name']:
             state['step'] = 'okb_company_name'
             return tr('Компания не найдена по ИНН. Заполните название фирмы.'), [[CANCEL]], state

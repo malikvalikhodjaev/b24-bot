@@ -1,0 +1,22 @@
+[Unit]
+Description=FOM Mini App read-only INN lookup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/datfo-crm-bot
+ExecStart=%h/datfo-crm-bot/.venv/bin/python -m datfo_crm_bot.miniapp_api
+Environment=PYTHONPATH=%h/datfo-crm-bot/src
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGINT
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

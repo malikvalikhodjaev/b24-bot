@@ -94,6 +94,9 @@ class WorkStore:
                 user_id INTEGER NOT NULL,pharmacy_id INTEGER NOT NULL,company_id INTEGER NOT NULL,
                 url TEXT NOT NULL,title TEXT NOT NULL,checked_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY(user_id,pharmacy_id));
+            CREATE TABLE IF NOT EXISTS fom_company_references(
+                user_id INTEGER NOT NULL,company_id INTEGER NOT NULL,inn TEXT NOT NULL,
+                url TEXT NOT NULL,title TEXT NOT NULL,PRIMARY KEY(user_id,company_id));
             CREATE TABLE IF NOT EXISTS fom_requests(
                 id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL UNIQUE,
                 creator INTEGER NOT NULL, initial_recipient INTEGER NOT NULL,
@@ -120,6 +123,7 @@ class WorkStore:
                                   ('archived', 'INTEGER NOT NULL DEFAULT 0'),
                                   ('link_kind', "TEXT NOT NULL DEFAULT 'deal'"),
                                   ('pharmacy_id','INTEGER'),('pharmacy_company_id','INTEGER'),
+                                  ('company_id','INTEGER'),('company_inn','TEXT'),
                                   ('support_details','TEXT'),('contact_details','TEXT'),
                                   ('technician_details','TEXT')]:
             if name not in columns:
@@ -300,7 +304,12 @@ class WorkStore:
             pharmacy_link = bool(link.get('link_kind')=='pharmacy' and link['id']==0 and pharmacy_reference
                 and pharmacy_reference['url']==link['url'] and pharmacy_reference['company_id']==link.get('company_id')
                 and link['request_id']==f"pharmacy:{actor}:{link['pharmacy_id']}")
-            if not bot_link and not existing_link and not pharmacy_link:
+            company_reference = self.db.execute('SELECT * FROM fom_company_references WHERE user_id=? AND company_id=?',
+                (actor,link.get('company_id',0))).fetchone()
+            company_link = bool(link.get('link_kind')=='company' and link['id']==0 and company_reference
+                and company_reference['url']==link['url'] and company_reference['inn']==link.get('inn')
+                and link['request_id']==f"company:{actor}:{link['company_id']}:{link['inn']}")
+            if not bot_link and not existing_link and not pharmacy_link and not company_link:
                 raise InboxError(tr('Б24 билан тасдиқланган боғланишни танланг.'))
             test = bool((operation and operation['value'].get('live_test')) or
                         (reference and reference['test']) or title.startswith('[ТЕСТ БОТА]'))
@@ -319,6 +328,8 @@ class WorkStore:
                     raise InboxError(tr('Заявка рақами бошқа маълумотларга тегишли.'))
                 if pharmacy_link and (row['pharmacy_id'],row['pharmacy_company_id']) != (link['pharmacy_id'],link['company_id']):
                     raise InboxError(tr('Б24 билан тасдиқланган боғланишни танланг.'))
+                if company_link and (row['company_id'],row['company_inn']) != (link['company_id'],link['inn']):
+                    raise InboxError(tr('Б24 билан тасдиқланган боғланишни танланг.'))
             else:
                 ident = self.db.execute('''INSERT INTO fom_requests(request_id,creator,initial_recipient,
                     deal_id,deal_url,deal_request,title,description,test,status,owner,queue,support_details,contact_details,technician_details)
@@ -330,6 +341,9 @@ class WorkStore:
                 if pharmacy_link:
                     self.db.execute("UPDATE fom_requests SET link_kind='pharmacy',pharmacy_id=?,pharmacy_company_id=? WHERE id=?",
                         (link['pharmacy_id'],link['company_id'],ident))
+                if company_link:
+                    self.db.execute("UPDATE fom_requests SET link_kind='company',company_id=?,company_inn=? WHERE id=?",
+                        (link['company_id'],link['inn'],ident))
                 row = self.ticket(ident)
                 recipients = {actor,recipient} if recipient or technician_details else {actor,*[member['telegram_id'] for member in self.members() if member['role'] != 'fom_sales']}
                 self._event(row,actor,'created',None,recipients)
@@ -546,6 +560,8 @@ class WorkInbox:
         text += tr('\n\n▶️ Карточка остида кейинги амални танланг.')
         if row.get('link_kind')=='pharmacy':
             text = text.replace(tr('Б24 сделкаси #')+str(row['deal_id']),tr('🏪 Аптека'))
+        elif row.get('link_kind')=='company':
+            text = text.replace(tr('Б24 сделкаси #')+str(row['deal_id']),tr('🏢 Компания / Фирма')+' · '+tr('ИНН: ')+html.escape(row['company_inn']))
         self.inline(user,text,buttons)
 
     def link(self, user, ident):

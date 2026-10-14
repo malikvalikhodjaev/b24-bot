@@ -177,7 +177,7 @@ class Store:
     def other_inflight(self, request_id: str, field: str, value: str, *, phase: str | None = None) -> bool:
         for row in self.db.execute("SELECT request_id,value FROM operations WHERE request_id<>? AND status IN ('sending','created','uncertain')", (request_id,)):
             state = json.loads(row["value"])
-            if state.get("workflow") != "okb" or state.get(field) != value:
+            if (state.get("workflow") not in {"okb", "company_only"} and not state.get('company_only')) or state.get(field) != value:
                 continue
             if phase:
                 step = self.operation_step(row["request_id"], phase)

@@ -50,8 +50,10 @@ class SupportIntake:
             value=data.get(key)
             if not isinstance(value,str) or not minimum<=len(value.strip())<=maximum:
                 raise InboxError(tr('Заполните тему (3–100 символов) и описание (5–1200 символов).'))
-        if data.get('pharmacy_kind') not in {'new','existing'}:
+        if data.get('pharmacy_kind') not in {'new','existing','company'}:
             raise InboxError(tr('Выберите новую или существующую аптеку.'))
+        if data.get('pharmacy_kind') == 'company' and data.get('intake_version') != 2:
+            raise InboxError(tr('Откройте новую форму через меню бота.'))
         contact_details = collect_contact(data)
         self.inbox.say(user,intake('processing_support'),cache=False)
         try:
@@ -61,8 +63,20 @@ class SupportIntake:
         draft.update(title=data['request_title'].strip(),description=data['request_description'].strip())
         draft['support_details'] = details
         draft['contact_details'] = contact_details
+        if data.get('intake_version') == 2:
+            from .inn_target import selection
+            draft.update(selection(self.sales,data))
+            if data.get('pharmacy_kind') == 'company':
+                draft.update(company_only=True,step='recipient')
+                draft['company_form'] = {key:draft[key] for key in (
+                    'inn','company','company_name','new_company','company_consent','inn_intake')}
+                draft['company_form'].update(kind='company',workflow='company_only',
+                                             request_id=draft['request_id']+'-company')
+                self.store.set_session(user,draft)
+                self.inbox.prompt(user,draft)
+                return
         if data.get('pharmacy_kind')=='existing':
-            draft.update(pharmacy=self.sales.lookup_fom(data.get('fom_id')),step='recipient')
+            draft.update(pharmacy=draft['pharmacy'] if data.get('intake_version') == 2 else self.sales.lookup_fom(data.get('fom_id')),step='recipient')
             if draft['pharmacy']['company_id']:
                 draft['company']=self.sales.company(draft['pharmacy']['company_id'])
         elif data.get('pharmacy_kind')=='new':
@@ -104,6 +118,11 @@ class SupportIntake:
 
     def preview(self, user, draft):
         contact = contact_preview(draft.get('contact_details'))
+        if draft.get('company_only'):
+            return (intake('company_section')+'\n<b>'+escape(draft['company_name'])+'</b>\n'
+                +tr('ИНН: ')+escape(draft['inn'])+'\n'+tr('Без привязки к аптечной точке.')
+                + ('\n'+intake('new_company') if draft.get('new_company') else '')
+                + ('\n\n'+contact if contact else ''))
         if draft.get('pharmacy_form'):
             text = pharmacy_blocks(draft['pharmacy_form'],self.inbox.registration.user(user).name)
             return text + ('\n\n'+contact if contact else '')
@@ -132,6 +151,24 @@ class SupportIntake:
             revalidate(draft.get('support_details'), self.inbox.live.crm.api)
         except RemoteError as exc:
             raise InboxError(tr('Не удалось проверить список типов обращения в Б24. Попробуйте ещё раз немного позже.')) from exc
+        if draft.get('company_only'):
+            from .inn_target import save_company
+            from .okb_service import PendingStep
+            child = draft['company_form']
+            self.primary.prepare(user,child,utc_text(self.sales.bot.clock()))
+            try:
+                company = save_company(self.sales,user,child)
+            except (RemoteError,PendingStep) as exc:
+                raise InboxError(tr('Б24 пока не подтвердил сохранение фирмы. Нажмите «Отправить» ещё раз: проверим сохранённые шаги без дублей.')) from exc
+            self.primary.status(child['request_id'],'succeeded',company,utc_text(self.sales.bot.clock()))
+            url = self.inbox.live.crm.portal+f"/crm/company/details/{company['id']}/"
+            with self.store.db:
+                self.store.db.execute('''INSERT INTO fom_company_references(user_id,company_id,inn,url,title)
+                    VALUES(?,?,?,?,?) ON CONFLICT(user_id,company_id) DO UPDATE SET
+                    inn=excluded.inn,url=excluded.url,title=excluded.title''',
+                    (user,company['id'],draft['inn'],url,company['title']))
+            return {'id':0,'company_id':company['id'],'inn':draft['inn'],'link_kind':'company',
+                'url':url,'title':company['title'],'request_id':f"company:{user}:{company['id']}:{draft['inn']}"}
         if draft.get('pharmacy_form'):
             child=draft['pharmacy_form']
             self.primary.prepare(user,child,utc_text(self.sales.bot.clock()))
@@ -145,4 +182,7 @@ class SupportIntake:
             pharmacy={'id':result['id'],'company_id':result['company_id']}
         else:
             pharmacy=draft['pharmacy']
+            if draft.get('inn_intake'):
+                from .inn_target import check_company
+                check_company(self.sales,draft)
         return self.link(user,pharmacy)
