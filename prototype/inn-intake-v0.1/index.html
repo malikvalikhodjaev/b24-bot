@@ -4,7 +4,7 @@
 <header><div class="brand" aria-label="FOM"><span>F</span><span>O</span><span>M</span></div><div><strong>Сделки и заявки</strong><p>Проверка нового сценария</p></div></header>
 <div class="test-notice">🧪 Тестовая форма. Поиск читает данные Б24, подтверждение ничего туда не записывает.</div>
 <nav class="modes" aria-label="Что создаём"><button id="modeDeal" type="button" aria-pressed="true">➕ Сделка</button><button id="modeSupport" type="button" aria-pressed="false">🛠 Заявка</button></nav>
-<section id="lookupSection"><div id="titleEntry"><label for="dealTitle">Название сделки *</label><input id="dealTitle" form="entryForm" minlength="2" maxlength="120" required></div>
+<section id="lookupSection"><div id="titleEntry"><label for="dealTitle">Название сделки *</label><input id="dealTitle" form="entryForm" minlength="2" maxlength="120" aria-describedby="dealTitleHint" required><p id="dealTitleHint" class="hint">Можно указать название аптеки.</p></div>
 <form id="lookupForm" novalidate><label id="lookupHeading" for="inn">ИНН аптеки (необязательно)</label><div class="input-action"><input id="inn" name="inn" inputmode="numeric" maxlength="9" pattern="[0-9]{9}" required autocomplete="off"><button id="lookupButton" type="submit">Найти фирму</button></div><p id="innHint" class="hint">По ИНН покажем фирму и её аптечные точки.</p>
 </form>
 <p id="progress" class="progress" role="status" aria-live="polite" hidden></p><p id="error" class="error" role="alert" hidden></p>
