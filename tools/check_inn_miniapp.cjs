@@ -13,7 +13,7 @@ const companies=[{id:7,title:'ООО «Саломат Фарм»',pharmacy_count
   async function page(mode='deal',width=390){
     const context=await browser.newContext({viewport:{width,height:844},colorScheme:'dark'});
     const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));
-    await context.addInitScript(()=>{window.sent=[];window.Telegram={WebApp:{platform:'android',sendData:data=>window.sent.push(JSON.parse(data)),ready(){},expand(){},MainButton:{setText(){},onClick(){},show(){},showProgress(){},hideProgress(){}}}};});
+    await context.addInitScript(()=>{window.sent=[];window.Telegram={WebApp:{platform:'android',sendData:data=>window.sent.push(JSON.parse(data)),ready(){},expand(){},MainButton:{setText(){},onClick(callback){window.primaryAction=callback;},show(){},showProgress(){},hideProgress(){}}}};});
     await page.route('https://core.telegram.org/js/telegram-web-app.js',route=>route.fulfill({body:'',contentType:'text/javascript'}));
     await page.route('**/api/lookup',async route=>{
       const data=route.request().postDataJSON();assert.equal(data.token,'datfo-form-'+'a'.repeat(32));assert.equal(data.mode,mode);
@@ -29,7 +29,7 @@ const companies=[{id:7,title:'ООО «Саломат Фарм»',pharmacy_count
   }
   async function find(p,inn='300000101'){await p.locator('[name=inn]').fill(inn);await p.locator('#findInn').click();assert.match(await p.locator('#lookupStatus').innerText(),/Подождите/);await p.waitForFunction(()=>!document.getElementById('findInn').disabled);}
   async function program(p){await p.locator('[name=discussion_programs]').first().check();}
-  async function send(p){await p.locator('[type=submit]').click();await p.waitForFunction(()=>window.sent.length===1);return p.evaluate(()=>window.sent[0]);}
+  async function send(p){await p.evaluate(()=>window.primaryAction());await p.waitForFunction(()=>window.sent.length===1);return p.evaluate(()=>window.sent[0]);}
   {
     const {page:p,context,errors}=await page('deal',320);
     await p.locator('[name=deal_title]').fill('Обсудить внедрение F-Apteka');await program(p);
@@ -81,7 +81,7 @@ const companies=[{id:7,title:'ООО «Саломат Фарм»',pharmacy_count
   }
   {
     const {page:p,context}=await page();await find(p);await p.locator('[name=inn]').fill('300000102');
-    assert.equal(await p.locator('#pharmacyChoice').isVisible(),false);await p.locator('[type=submit]').click();assert.match(await p.locator('#error').innerText(),/Сначала найдите/);assert.equal(await p.evaluate(()=>window.sent.length),0);
+    assert.equal(await p.locator('#pharmacyChoice').isVisible(),false);await p.evaluate(()=>window.primaryAction());assert.match(await p.locator('#error').innerText(),/Сначала найдите/);assert.equal(await p.evaluate(()=>window.sent.length),0);
     results.push('changed-inn-invalidates-selection');await context.close();
   }
   {
