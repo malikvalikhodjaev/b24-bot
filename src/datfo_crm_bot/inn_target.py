@@ -34,6 +34,14 @@ def selection(sales, data):
             'company_id':company['id'],'fom_id':str(row.get(FOM_ID_FIELD) or ''),
             'address':str(row.get(fields['address']) or ''),'phone':str(row.get(fields['phone']) or ''),
             'status':sales.pharmacy_status(row)}
+        for key in ('business_region','city','current_program'):
+            value = row.get(fields.get(key))
+            if isinstance(value,list):
+                value = value[0] if value else None
+            if value not in (None,'',0):
+                choice = next((item for item in sales.pharmacy_crm.choices(key) if item['id']==str(value)),None)
+                if choice:
+                    result['pharmacy'][key] = choice
     return result
 
 

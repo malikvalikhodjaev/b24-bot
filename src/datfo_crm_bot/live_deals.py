@@ -135,7 +135,7 @@ class LiveBot(Bot):
             response, keyboard, child = self.sales.form.route_location(user_id, location, child)
             state['pharmacy_form'] = child
             if child.get('collected'):
-                state.update(title='План: '+child['title'], company=child.get('company'), inn=child['inn'],
+                state.update(title=state.get('custom_deal_title') or 'План: '+child['title'], company=child.get('company'), inn=child['inn'],
                              address=child['address'], phone=child['phone'])
                 return self.sales.description_prompt(state)
             return response, keyboard, state

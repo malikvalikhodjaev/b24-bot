@@ -100,7 +100,7 @@ class Bot:
         state = self.store.session(user_id)
         if text.strip() == CONFIRM and state and state.get('step')=='confirm':
             from .intake_ui import phrase
-            self.telegram.send(chat_id, phrase('saving'))
+            self.telegram.send(chat_id, phrase('saving_deal' if state.get('kind') == 'deal' else 'saving'))
         try:
             venue = message.get('venue')
             location = message.get('location') or (venue.get('location') if isinstance(venue, dict) else None)

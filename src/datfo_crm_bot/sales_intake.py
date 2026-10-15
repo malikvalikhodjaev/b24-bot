@@ -224,7 +224,7 @@ class SalesIntake:
             state['pharmacy_form'] = child
             if not child.get('collected'):
                 return response, keyboard, state
-            state.update(title='План: '+child['title'], company=child.get('company'), inn=child['inn'],
+            state.update(title=state.get('custom_deal_title') or 'План: '+child['title'], company=child.get('company'), inn=child['inn'],
                          address=child['address'], phone=child['phone'])
             if state.get('bulk_reminder') is not None:
                 state.update(state.pop('bulk_reminder'))
@@ -323,6 +323,11 @@ class SalesIntake:
         planned = reminder(data, self.bot.config.timezone, self.bot.clock())
         if 'discussion_programs' in data:
             state['discussion_programs'] = selected_programs(data['discussion_programs'], discussion_choices(self.crm.api))
+        custom_title = data.get('deal_title')
+        if custom_title not in (None,''):
+            if not isinstance(custom_title,str) or not 2 <= len(custom_title.strip()) <= 120 or custom_title.strip().startswith('/'):
+                raise ValueError(tr('Укажите название сделки (2–120 символов).'))
+            state['custom_deal_title'] = custom_title.strip()
         if data.get('pharmacy_kind') == 'title':
             if data.get('mode') != 'deal' or data.get('intake_version') != 2:
                 raise ValueError(tr('Откройте новую форму через меню бота.'))
@@ -339,7 +344,7 @@ class SalesIntake:
             chosen = selection(self, data)
             state.update(chosen)
             if data.get('pharmacy_kind') == 'company':
-                state.update(company_only=True,new_pharmacy=False,title='План: '+chosen['company_name'],
+                state.update(company_only=True,new_pharmacy=False,title=state.get('custom_deal_title') or 'План: '+chosen['company_name'],
                              address='',phone='',**planned)
                 return self.finish_form(user_id,state)
         if data.get('pharmacy_kind') == 'existing':
@@ -347,14 +352,14 @@ class SalesIntake:
             state.update(new_pharmacy=False,pharmacy=pharmacy,
                 company=self.company(pharmacy['company_id']) if pharmacy['company_id'] else None,
                 inn=state.get('inn','') if data.get('intake_version') == 2 else '',
-                title='План: '+pharmacy['title'],address=pharmacy['address'],phone=pharmacy['phone'],**planned)
+                title=state.get('custom_deal_title') or 'План: '+pharmacy['title'],address=pharmacy['address'],phone=pharmacy['phone'],**planned)
             return self.finish_form(user_id,state)
         child = {'kind': 'pharmacy', 'workflow': 'okb', 'sales_parent': state['request_id'],
                  'request_id': state['request_id']+'-pharmacy', 'step': 'okb_inn'}
         response, keyboard, child = self.form.route_payload(user_id, data, child)
         state.update(new_pharmacy=True, pharmacy_form=child, step='sales_okb', bulk_reminder=planned)
         if child.get('collected'):
-            state.update(title='План: '+child['title'], company=child.get('company'), inn=child['inn'], address=child['address'], phone=child['phone'], **planned)
+            state.update(title=state.get('custom_deal_title') or 'План: '+child['title'], company=child.get('company'), inn=child['inn'], address=child['address'], phone=child['phone'], **planned)
             state.pop('bulk_reminder')
             return self.finish_form(user_id, state)
         return response, keyboard, state

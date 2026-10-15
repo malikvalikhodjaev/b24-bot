@@ -23,7 +23,7 @@ from . import technician_picker
 
 
 def intake_saving():
-    return intake_phrase('saving')
+    return intake_phrase('saving_support')
 
 INBOX = '📥 Техник ёрдам заявкалари'
 NEW = '📝 Техник ёрдам заявкаси очиш'

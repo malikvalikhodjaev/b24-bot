@@ -49,44 +49,15 @@ class LiveCatalogue:
         return cls(ReadOnlyBitrix(webhook, read_timeout=12), OkbSettings.load(private_root / 'okb-settings.json'))
 
     def lookup(self, inn):
-        companies = self.crm.companies(inn_value(inn))
-        target = self.settings.pharmacy
-        if companies and self.statuses is None:
-            result = self.api.call('crm.item.fields', {'entityTypeId':target.entity_type_id, 'useOriginalUfNames':'Y'})['result']
-            meta = result.get('fields', {}).get(target.fields['status'], {})
-            self.statuses = {str(item['ID'] if 'ID' in item else item['id']):str(item.get('VALUE',item.get('value','')))
-                             for item in meta.get('items', [])}
-        results = []
-        for company in companies:
-            rows = self.api.list_all('crm.item.list', {'entityTypeId':target.entity_type_id,
-                'useOriginalUfNames':'Y', 'filter':{'categoryId':target.category_id,'companyId':company['id']},
-                'select':['*'], 'order':{'id':'ASC'}}, key='items')
-            pharmacies = []
-            seen = set()
-            for row in rows:
-                # Do not count unrelated entries if the portal ignores a filter.
-                if str(row.get('companyId')) != str(company['id']) or str(row.get('categoryId')) != str(target.category_id):
-                    continue
-                ident = int(row['id'])
-                if ident in seen:
-                    continue
-                seen.add(ident)
-                value = row.get(target.fields['status'])
-                if isinstance(value,list):
-                    value = value[0] if value else ''
-                status = (self.statuses or {}).get(str(value), 'Статус не указан')
-                pharmacies.append({'id':ident,'fom_id':str(row.get(FOM_ID_FIELD) or ''),
-                    'title':str(row.get('title') or 'Аптека'), 'address':str(row.get(target.fields['address']) or ''),
-                    'status':status, 'inactive':bool(re.search(r'закрыт|не работ',status,re.I))})
-            results.append({**company,'inn':inn,'pharmacies':pharmacies,'pharmacy_count':len(pharmacies)})
-        return results
+        from datfo_crm_bot.inn_lookup import InnCatalogue
+        return InnCatalogue(self.api,self.settings).lookup(inn)
 
 
 class DemoCatalogue:
     def lookup(self, inn):
         inn = inn_value(inn)
         pharmacy = lambda ident, fom, title, address, status: {'id':ident,'fom_id':fom,'title':title,
-            'address':address,'status':status,'inactive':status in {'Закрыта','Не работаем'}}
+            'address':address,'status':status,'inactive':status in {'Закрыта','Не работаем'},'business_region':'Город Ташкент','city':title.split(' — ')[-1],'current_program':'1С'}
         examples = {
             '300000101':[{'id':101,'title':'ООО «Саломат Фарм»','inn':inn,'pharmacies':[
                 pharmacy(10101,'00081','Саломат Фарм — Мирабад','Ташкент, Мирабадский район, ул. Мирабад, 12','Работает'),
@@ -125,6 +96,11 @@ class PreviewCatalogue:
         """Validate the proposed binding without creating any CRM entities."""
         if not isinstance(data,dict) or data.get('mode') not in {'deal','support'}:
             raise ValueError('Выберите сделку или заявку.')
+        custom_title = data.get('deal_title')
+        if data['mode']=='deal' and custom_title not in (None,''):
+            if not isinstance(custom_title,str) or not 2 <= len(custom_title.strip()) <= 120 or custom_title.strip().startswith('/'):
+                raise ValueError('Укажите название сделки (2–120 символов).')
+            custom_title = custom_title.strip()
         title_only = data.get('target') == 'title'
         if title_only:
             name = data.get('deal_title')
@@ -180,7 +156,7 @@ class PreviewCatalogue:
             programs = [row for row in REFERENCE['discussion_programs'] if row['id'] in chosen]
             if not isinstance(chosen,list) or not chosen or len(programs)!=len(set(chosen)):
                 raise ValueError('Выберите программы для обсуждения с клиентом.')
-            result.update(title=data['deal_title'].strip() if title_only else 'План: '+(pharmacy or company)['title'],programs=[row['title'] for row in programs],
+            result.update(title=custom_title or 'План: '+(pharmacy or company)['title'],programs=[row['title'] for row in programs],
                           pipeline='Продажи и онбординг [KG]',stage='План')
             if data.get('reminder'):
                 reminder = data['reminder']

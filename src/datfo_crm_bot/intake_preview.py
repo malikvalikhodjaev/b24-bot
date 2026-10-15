@@ -56,6 +56,12 @@ def sale_blocks(state, manager):
             tr('Телефон: ') + esc(state.get('phone') or phrase('not_set'))])
         if row.get('status'):
             text = text.replace('\nFOM ID:', '\n' + tr('Статус аптеки: ') + esc(row['status']['title']) + '\nFOM ID:', 1)
+        details = []
+        for key,label in (('business_region','Бизнес-регион: '),('city','Город/район: '),('current_program','Текущая программа: ')):
+            if row.get(key):
+                details.append(tr(label)+esc(row[key]['title']))
+        if details:
+            text = text.replace(tr('Адрес: '),'\n'.join(details)+'\n'+tr('Адрес: '),1)
     text += ('\n\n' if text else '') + phrase('deal_section') + '\n<b>' + esc(state['title']) + '</b>'
     text += '\n' + tr('Воронка: ') + esc(state['category_name']) + '\n' + tr('Стадия: ') + esc(state['initial_stage_name'])
     text += '\n' + tr('Ответственный: ') + esc(manager)

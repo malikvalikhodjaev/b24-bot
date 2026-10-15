@@ -73,6 +73,29 @@ class DealTests(unittest.TestCase):
                              or (method=='crm.item.get' and data['entityTypeId']==1034)
                              for method,data in self.api.calls))
 
+    def test_custom_title_is_kept_when_linked_to_company_or_pharmacy(self):
+        self.send_form(self.value(deal_title='Презентация для клиента'))
+        self.assertEqual(self.store.session(100)['title'],'Презентация для клиента')
+        self.say(CONFIRM)
+        self.assertEqual(self.api.rows[501]['title'],'Презентация для клиента')
+        self.assertEqual(self.api.rows[501]['companyId'],7)
+        self.assertNotIn('parentId1034',self.api.rows[501])
+        self.send_form(self.value(pharmacy_kind='existing',pharmacy_id=81,deal_title='Встреча в аптеке'))
+        self.say(CONFIRM)
+        self.assertEqual(self.api.rows[502]['title'],'Встреча в аптеке')
+        self.assertEqual(self.api.rows[502]['parentId1034'],81)
+
+    def test_selected_pharmacy_preview_uses_live_region_and_city(self):
+        sales = self.live.bot.sales
+        fields = sales.pharmacy_crm.settings.pharmacy.fields
+        self.api.pharmacies[81].update({fields['business_region']:'r1',fields['city']:'city1'})
+        original = sales.pharmacy_crm.choices
+        sales.pharmacy_crm.choices = lambda key: [{'id':'r1','title':'Город Ташкент'}] if key=='business_region' else [{'id':'city1','title':'Мирабадский район'}] if key=='city' else original(key)
+        self.send_form(self.value(pharmacy_kind='existing',pharmacy_id=81))
+        preview = self.telegram.messages[-1][1]
+        self.assertIn('Бизнес-регион: Город Ташкент',preview)
+        self.assertIn('Город/район: Мирабадский район',preview)
+
     def test_title_only_ignores_stale_fields_from_inn_branch(self):
         self.send_form(self.title_value(inn='123456789',company_id=7,pharmacy_id=81,
             company_name='Old company',create_company=True,phone='+998909876543'))
@@ -362,19 +385,23 @@ class ApiTests(unittest.TestCase):
                 self.assertEqual(data['filter'],{'categoryId':17,'companyId':7})
                 self.assertEqual(data['select'],['*'])
                 self.assertEqual(options['key'],'items')
-                return [{'id':81,'companyId':7,'categoryId':17,'title':'Pharmacy','status':9},
+                return [{'id':81,'companyId':7,'categoryId':17,'title':'Pharmacy','status':9,'region':'r1','city':'city1'},
                     {'id':81,'companyId':7,'categoryId':17,'title':'Duplicate','status':9},
                     {'id':82,'companyId':8,'categoryId':17,'title':'Wrong company','status':9},
                     {'id':83,'companyId':7,'categoryId':18,'title':'Wrong category','status':9}]
             def call(_,method,data):
-                return {'result':{'fields':{'status':{'items':[{'ID':9,'VALUE':'Закрыта'}]}}}}
+                return {'result':{'fields':{'status':{'items':[{'ID':9,'VALUE':'Закрыта'}]},
+                    'region':{'items':[{'ID':'r1','VALUE':'Город Ташкент'}]},
+                    'city':{'items':[{'ID':'city1','VALUE':'Мирабадский район'}]}}}}
         settings = SimpleNamespace(pharmacy=SimpleNamespace(entity_type_id=1034,category_id=17,
-            fields={'status':'status','address':'address'}))
+            fields={'status':'status','address':'address','business_region':'region','city':'city'}))
         result = InnCatalogue(Api(),settings).lookup('000000081')
         self.assertEqual(len(result),1)
         self.assertEqual(result[0]['pharmacy_count'],1)
         self.assertEqual(result[0]['pharmacies'][0]['fom_id'],'')
         self.assertTrue(result[0]['pharmacies'][0]['inactive'])
+        self.assertEqual(result[0]['pharmacies'][0]['business_region'],'Город Ташкент')
+        self.assertEqual(result[0]['pharmacies'][0]['city'],'Мирабадский район')
 
 
 if __name__ == '__main__':
