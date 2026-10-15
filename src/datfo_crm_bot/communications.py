@@ -316,7 +316,6 @@ class InboxTest:
             buttons += [[button('👤 Ким олганини текшириш', 'take')]]
         if row['owner'] == actor and row['status'] != 'closed':
             buttons += [[button('↩️ Навбатга қайтариш', 'release')]]
-        buttons.append([{'text': GUIDE, 'callback_data':'guide:inbox'}])
         payload = {'chat_id':user, 'text':text, 'parse_mode':'HTML', 'link_preview_options':{'is_disabled':True}}
         if buttons:
             payload['reply_markup'] = {'inline_keyboard':buttons}

@@ -7,7 +7,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from datfo_crm_bot.api import RemoteError
 from datfo_crm_bot.communications import InboxStore, InboxTest, NEW, SEND, CANCEL_REQUEST, GUIDE
 from datfo_crm_bot.config import User
-from datfo_crm_bot.guidance import Guide
+from datfo_crm_bot.guidance import Guide, with_guide
+from datfo_crm_bot.i18n import tr
 from datfo_crm_bot.okb_access import OkbTelegram
 from datfo_crm_bot.registration import Registration, RegistrationSettings
 from datfo_crm_bot.simulation import Simulation
@@ -85,7 +86,17 @@ class GuidanceTests(unittest.TestCase):
         self.guide.handle(self.help_callback(user=200))
         self.assertEqual(self.primary.registration_session(200),state)
         self.assertIn('&lt;А&gt;',self.telegram.calls[-1][1]['text'])
-        self.assertIn([GUIDE],self.registration.keyboard(200))
+        self.assertNotIn([GUIDE],self.registration.keyboard(200))
+
+    def test_restored_keyboard_removes_help_without_changing_actions_or_source(self):
+        action = {'text':'Открыть форму','web_app':{'url':'https://example.test/form'}}
+        keyboard = [[GUIDE], [action, tr(GUIDE, 'ru')], ['Отмена', '📖 Йўриқнома']]
+        expected = [[action], ['Отмена']]
+        self.assertEqual(with_guide(keyboard), expected)
+        self.assertEqual(self.registration.direct_form_keyboard(200, keyboard), expected)
+        self.assertEqual(keyboard, [[GUIDE], [action, tr(GUIDE, 'ru')], ['Отмена', '📖 Йўриқнома']])
+        self.assertIsNone(with_guide(None))
+        self.assertEqual(with_guide([[GUIDE]]), [])
 
     def test_help_in_old_simulation_does_not_exit_or_advance_form(self):
         self.dispatch('/test')

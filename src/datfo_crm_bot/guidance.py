@@ -11,15 +11,14 @@ GUIDE_LABELS = {GUIDE, "📖 Йўриқнома"}
 
 
 def with_guide(keyboard):
+    """Keep restored keyboards usable without the retired help button."""
     if keyboard is None:
         return None
-    rows = [list(row) for row in keyboard]
-    from .navigation import MORE
-    if any(label in row for row in rows for label in (MORE, tr(MORE, 'uz'))):
-        return rows
-    if not any(GUIDE in row for row in rows):
-        rows.append([GUIDE])
-    return rows
+    retired = {tr(label, language) for label in GUIDE_LABELS for language in (None, 'ru', 'uz')}
+    rows = [[button for button in row
+             if (button if isinstance(button, str) else button.get('text')) not in retired]
+            for row in keyboard]
+    return [row for row in rows if row]
 
 
 TOPICS = {key: text['uz'] for key, text in HELP_TEXTS.items()}

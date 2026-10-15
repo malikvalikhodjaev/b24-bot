@@ -158,7 +158,7 @@ class LanguageFlowTests(unittest.TestCase):
             self.assertNotEqual(tr(source,'ru'),tr(source,'uz'),source)
         self.assertNotIn('guide:inbox',str(self.guide.registration.keyboard(200)))
 
-    def test_topic_navigation_preserves_forms_and_request_opens_technician_help(self):
+    def test_legacy_topic_navigation_preserves_forms_and_request_has_only_actions(self):
         row = self.ticket(300)
         registration = {'step':'name'}
         sales = {'workflow':'okb','step':'okb_inn','request_id':'help-pharmacy'}
@@ -189,8 +189,8 @@ class LanguageFlowTests(unittest.TestCase):
                 self.assertEqual(self.store.session(200),support)
             self.work.card(300,row)
             links = {button['callback_data'] for buttons in self.raw.calls[-1][1]['reply_markup']['inline_keyboard'] for button in buttons}
-            self.assertIn('guide:tech',links)
-            self.assertNotIn('guide:work_inbox',links)
+            self.assertFalse(any(link.startswith('guide:') for link in links))
+            self.assertTrue(any(link.startswith('wr:take:') for link in links))
             page = open_topic(300,'tech')
             self.assertEqual(page['text'],tr(TOPICS['tech'],language))
             self.assertEqual(self.store.ticket(row['id'])['status'],'assigned')

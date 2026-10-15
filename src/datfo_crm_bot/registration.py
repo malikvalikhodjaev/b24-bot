@@ -91,6 +91,7 @@ class Registration:
 
     def direct_form_keyboard(self, telegram_id, keyboard):
         """Keep action buttons direct even when an old reply restores a menu."""
+        keyboard = with_guide(keyboard)
         work = self.work_inbox
         if keyboard is not None and work and self.user(telegram_id):
             from .service import DEAL_LABELS, SUPPORT_LABELS, PHARMACY, STATS
@@ -208,7 +209,7 @@ class Registration:
         return self.support_inbox_allowed(user)
 
     def command_menu(self, user, commands):
-        common = {'start','profile','help','guide','next','whoami','register','cancel','pending'}
+        common = {'start','profile','next','whoami','register','cancel','pending'}
         if self.user(user):
             common |= {'my_crm','reminders','request_cancel'}
             if user in self.settings.admins:
@@ -271,7 +272,6 @@ class Registration:
         return rows
 
     def more_keyboard(self, telegram_id):
-        from .guidance import GUIDE
         from .navigation import HOME
         if not self.user(telegram_id):
             return self.keyboard(telegram_id)
@@ -289,7 +289,7 @@ class Registration:
             from .work_inbox import STATS
             actions.append(STATS)
         rows.extend([actions[index:index + 2] for index in range(0, len(actions), 2)])
-        return rows + [[PROFILE, GUIDE], [HOME]]
+        return rows + [[PROFILE], [HOME]]
 
     def profile_keyboard(self, telegram_id):
         from .language_ui import CHOICES

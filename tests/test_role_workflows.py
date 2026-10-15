@@ -6,6 +6,7 @@ import unittest
 import test_work_inbox as fixture
 from datfo_crm_bot.app import COMMANDS, dispatch
 from datfo_crm_bot.crm_list import hub, show
+from datfo_crm_bot.guidance import GUIDE
 from datfo_crm_bot.i18n import LocalizedTelegram, language_context, tr
 from datfo_crm_bot.language_ui import LanguageUI
 from datfo_crm_bot.personal_statistics import MY_STATS
@@ -13,7 +14,7 @@ from datfo_crm_bot.registration import PROFILE
 from datfo_crm_bot.role_access import RoleAccess
 from datfo_crm_bot.service import DEAL, SUPPORT
 from datfo_crm_bot.support_statistics import show as support_stats
-from datfo_crm_bot.work_inbox import INBOX, STATS as TECH_STATS
+from datfo_crm_bot.work_inbox import INBOX, DIAGNOSTICS, STATS as TECH_STATS
 
 
 class RoleWorkflowTests(unittest.TestCase):
@@ -47,6 +48,8 @@ class RoleWorkflowTests(unittest.TestCase):
                 self.assertNotIn(DEAL,self.labels(300))
                 self.assertNotIn(SUPPORT,self.labels(300))
                 self.assertIn(PROFILE,self.labels(300))
+                for user in (100, 200, 300, 400, 700):
+                    self.assertNotIn(GUIDE, self.labels(user))
         manager={row['command'] for row in self.registration.command_menu(200,COMMANDS)}
         technician={row['command'] for row in self.registration.command_menu(300,COMMANDS)}
         self.assertTrue({'deal','okb','my_stats'}<=manager)
@@ -54,6 +57,13 @@ class RoleWorkflowTests(unittest.TestCase):
         self.assertNotIn('requests',manager)
         self.assertTrue({'requests','requests_stats','profile'}<=technician)
         self.assertFalse({'deal','okb','my_stats','stats','support'}&technician)
+        for user in (None, 100, 200, 300, 400):
+            commands = {row['command'] for row in self.registration.command_menu(user, COMMANDS)}
+            self.assertFalse({'help', 'guide'} & commands)
+            self.assertIn('next', commands)
+        self.assertTrue({'diagnostics'} <= manager & technician)
+        self.assertIn(DIAGNOSTICS, str(self.work.keyboard(200)))
+        self.assertIn(DIAGNOSTICS, str(self.work.keyboard(300)))
         self.store.grant(200,'off',100)
         self.assertFalse(self.registration.sales_allowed(200))
         self.assertNotIn(MY_STATS,self.labels(200))

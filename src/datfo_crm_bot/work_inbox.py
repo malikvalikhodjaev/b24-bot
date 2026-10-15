@@ -12,7 +12,7 @@ from uuid import uuid4
 from .api import RemoteError
 from .communications import InboxError, person_label
 from .config import ConfigError
-from .guidance import GUIDE, with_guide
+from .guidance import with_guide
 from .service import SUPPORT, SUPPORT_LABELS
 from .i18n import user_language
 from .navigation import HOME, check_phone_step, input_error, menu_text, phrase
@@ -555,8 +555,7 @@ class WorkInbox:
             binding = self.sync.binding(row['id'])
             if binding and binding['state']=='conflict':
                 buttons += [[button(tr('↩️ Б24даги ҳолатни қабул қилиш'),'reconcile')]]
-        buttons += [[button(tr('🕘 Ҳаракатлар тарихи'),'history'),button(tr('🔄 Янгилаш'),'card')],
-                    [{'text':GUIDE,'callback_data':'guide:tech' if self.store.role(user) in {'tech','trainer','dispatcher'} else 'guide:work_inbox'}]]
+        buttons += [[button(tr('🕘 Ҳаракатлар тарихи'),'history'),button(tr('🔄 Янгилаш'),'card')]]
         text += tr('\n\n▶️ Карточка остида кейинги амални танланг.')
         if row.get('link_kind')=='pharmacy':
             text = text.replace(tr('Б24 сделкаси #')+str(row['deal_id']),tr('🏪 Аптека'))
